@@ -152,18 +152,18 @@ def get_bias(n_layers: int, cfg: dict) -> List[Any]:
 
 class NeuralNet(nn.Module):
     OPTIMIZERS = {
-        "Adagrad": torch.optim.Adagrad,
-        "Adam": torch.optim.Adam,
-        "AdamW": torch.optim.AdamW,
-        "SparseAdam": torch.optim.SparseAdam,
-        "Adamax": torch.optim.Adamax,
-        "ASGD": torch.optim.ASGD,
-        "LBFGS": torch.optim.LBFGS,
-        "NAdam": torch.optim.NAdam,
-        "RAdam": torch.optim.RAdam,
-        "RMSprop": torch.optim.RMSprop,
-        "Rprop": torch.optim.Rprop,
-        "SGD": torch.optim.SGD,
+        "adagrad": torch.optim.Adagrad,
+        "adam": torch.optim.Adam,
+        "adamw": torch.optim.AdamW,
+        "sparseadam": torch.optim.SparseAdam,
+        "adamax": torch.optim.Adamax,
+        "asgd": torch.optim.ASGD,
+        "lbfgs": torch.optim.LBFGS,
+        "nadam": torch.optim.NAdam,
+        "radam": torch.optim.RAdam,
+        "rmsprop": torch.optim.RMSprop,
+        "rprop": torch.optim.Rprop,
+        "sgd": torch.optim.SGD,
     }
 
     def __init__(
@@ -235,7 +235,7 @@ class NeuralNet(nn.Module):
             self.layers.append(layer)
 
         # Get the optimizer
-        self.optimizer = self.OPTIMIZERS[optimizer](
+        self.optimizer = self.OPTIMIZERS[optimizer.lower()](
             self.parameters(), lr=learning_rate, **optimizer_kwargs
         )
 
