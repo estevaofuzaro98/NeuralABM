@@ -1,0 +1,45 @@
+# Uniform network structure
+uniform:
+  M: 19
+  N: 15
+  network:
+    distribution: uniform
+    parameters:
+      lower: 1
+      upper: 2
+  # Distribution for marginal constraints
+  mu: &marginal_distribution
+    distribution: uniform
+    parameters:
+      lower: 1
+      upper: 4
+  nu:
+    <<: *marginal_distribution
+  normalize_row_sums: False
+  epsilon: 1e-1
+
+# L1 distance as cost
+L1_network:
+  M: 13
+  N: 9
+  network:
+    distribution: l1_distance
+  mu:
+    <<: *marginal_distribution
+  nu:
+    <<: *marginal_distribution
+  normalize_row_sums: True
+  epsilon: 5e-2
+
+# L2 distance as cost
+L2_network:
+  M: 2
+  N: 4
+  network:
+    distribution: l2_distance
+  mu:
+    <<: *marginal_distribution
+  nu:
+    <<: *marginal_distribution
+  normalize_row_sums: True
+  epsilon: 2

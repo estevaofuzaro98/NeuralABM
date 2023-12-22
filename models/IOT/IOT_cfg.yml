@@ -1,0 +1,83 @@
+Data:
+  load_from_dir:
+    path: /Users/thomasgaskin/utopya_output/IOT/231222-122308/data/uni0/data.h5
+  synthetic_data:
+
+    # Number of origin and destination zones
+    M: !is-positive-int 20
+    N: !is-positive-int 20
+
+    # Structure of the cost matrix
+    network:
+      distribution: !param
+        default: l1_distance
+        is_any_of: [uniform, normal, l1_distance, l2_distance]
+      parameters:
+        lower: 1
+        upper: 4
+
+    # Distribution for marginal constraints
+    mu: &marginal_distribution
+      distribution: uniform
+      parameters:
+        lower: 1
+        upper: 4
+    nu:
+      <<: *marginal_distribution
+
+    # Unbalancing std for the marginals
+    unbalancing:
+      mu: !is-positive-or-zero 0
+      nu: !is-positive-or-zero 0
+
+    # Normalise the cost matrix row sums
+    normalize_cost_rows: !is-bool True
+
+  # Regularisation parameter
+  epsilon: !is-positive 5e-2
+
+# Neural network for the cost matrix
+NeuralNetC:
+  num_layers: 3
+  nodes_per_layer:
+    default: 20
+  biases:
+    default: ~
+  activation_funcs:
+    default: tanh
+    layer_specific:
+      -1: sigmoid
+  learning_rate: !is-positive 0.002
+  prior:
+    distribution: uniform
+    parameters:
+      lower: 0
+      upper: 1
+
+# Neural network for the marginals
+NeuralNetM:
+  num_layers: 3
+  nodes_per_layer:
+    default: 20
+  biases:
+    default: ~
+  activation_funcs:
+    default: tanh
+    layer_specific:
+      -1: abs
+  learning_rate: !is-positive 0.002
+  prior:
+    distribution: uniform
+    parameters:
+      lower: 1
+      upper: 10
+
+Training:
+  Sinkhorn_kwargs:
+    max_iter: 100
+    tolerance: 1e-5
+  loss_function:
+    name: MSELoss
+    kwargs:
+      reduction: sum
+  device: cpu

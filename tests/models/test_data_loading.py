@@ -15,7 +15,7 @@ HW = import_module_from_path(
 )
 
 # Load the test config
-CFG_FILENAME = resource_filename("tests", "cfgs/test_data_loading.yml")
+CFG_FILENAME = resource_filename("tests", "cfgs/data_loading.yml")
 test_cfg = load_yml(CFG_FILENAME)
 
 

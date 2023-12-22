@@ -88,6 +88,23 @@ def broadcast(
     """
     return xr.broadcast(xr.Dataset({x: ds1, p: ds2}), **kwargs)[0]
 
+@is_operation("hadamard")
+@apply_along_dim
+def hadamard(
+    ds1: xr.DataArray, ds2: xr.DataArray, *, new_dim: str = "j", **kwargs
+) -> xr.DataArray:
+    """Calculates the Hadamard product of two one dimensional ``xr.DataArrays``, and inserts a new dimension.
+
+    :param ds1: the first array
+    :param ds2: the second array
+    :param new_dim: (optional) name for the new dimension
+    :param kwargs: passed on to ``np.mul``
+    :return: ``xr.DataArray`` with additional dimension
+    """
+    _prod = ds1.expand_dims([new_dim], axis=-1).data * ds2.expand_dims([new_dim], axis=0).data
+    return xr.DataArray(_prod,
+                        dims=list(ds1.dims) + [new_dim],
+                        coords=ds1.coords).assign_coords({new_dim: np.arange(_prod.shape[0])})
 
 # ----------------------------------------------------------------------------------------------------------------------
 # BASIC STATISTICS FUNCTIONS

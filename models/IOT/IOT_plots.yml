@@ -1,0 +1,183 @@
+loss:
+  based_on: loss
+
+# Plot the cost matrix with the lowest loss (mode of distribution)
+cost:
+  based_on:
+    - .creator.universe
+    - .matrix
+  select:
+    prediction:
+      path: predicted_C
+      transform:
+        - .isel_with_drop: [!dag_prev , {epoch: -1}]
+    true_cost:
+      path: C
+      transform: [.data]
+  transform:
+    - sub: [!dag_tag true_cost, !dag_tag prediction ]
+    - np.abs: [!dag_prev ]
+    - concat_along: [[!dag_tag true_cost, !dag_tag prediction ], 'type', ['True cost', 'Prediction']]
+      tag: data
+  col: type
+  cbar_kwargs:
+    label: $C_{ij}$
+  figsize: [!dag_result two_thirds_width, !dag_result third_width]
+
+# Plot the L1 error on the mode of the prediction
+cost_error:
+  based_on:
+    - .creator.universe
+    - .matrix
+    - .cmap_WhYeRe
+  select:
+    prediction:
+      path: predicted_C
+    true_cost:
+      path: C
+      transform: [.data]
+    loss_idx:
+      path: loss
+      transform:
+        - .sel_with_drop: [!dag_prev , {kind: C}]
+        - .idxmin: [!dag_prev ]
+  transform:
+    - .sel_with_drop: [!dag_tag prediction, {epoch: !dag_tag loss_idx}]
+    - sub: [!dag_tag true_cost, !dag_prev ]
+    - np.abs: [!dag_prev ]
+      tag: data
+  norm:
+    name: LogNorm
+  helpers:
+    set_title:
+      title: L1 error on C
+  style:
+    figure.figsize: [ !dag_result third_width, !dag_result third_width ]
+
+# Plot the true transport map
+transport_map:
+  based_on:
+    - .creator.universe
+    - .matrix
+  select:
+    prediction:
+      path: predicted_T
+      transform:
+        - .isel_with_drop: [!dag_prev , {epoch: -1}]
+    true_T:
+      path: T
+      transform: [.data]
+  transform:
+    - sub: [!dag_tag true_T, !dag_tag prediction ]
+    - np.abs: [!dag_prev ]
+    - concat_along: [[!dag_tag true_T, !dag_tag prediction ], 'type', ['True transport plan', 'Prediction']]
+      tag: data
+  col: type
+  cbar_kwargs:
+    label: $T_{ij}$
+  figsize: [!dag_result two_thirds_width, !dag_result third_width]
+
+# Plot the marginals (or rather their Hadamard product)
+marginals:
+  based_on:
+    - .creator.universe
+    - .matrix
+  select:
+    mu:
+      path: predicted_mu
+    nu:
+      path: predicted_nu
+    true_mu:
+      path: mu
+      transform: [.data]
+    true_nu:
+      path: nu
+      transform: [.data]
+    loss_idx:
+      path: loss
+      transform:
+        - .sel_with_drop: [!dag_prev , {kind: C}]
+        - .idxmin: [!dag_prev ]
+  transform:
+    - .sel_with_drop: [!dag_tag mu, {epoch: !dag_tag loss_idx}]
+      tag: pred_mu
+    - .sel_with_drop: [!dag_tag nu, {epoch: !dag_tag loss_idx}]
+      tag: pred_nu
+    - hadamard: [!dag_tag pred_mu, !dag_tag pred_nu]
+    - hadamard: [!dag_tag true_mu, !dag_tag true_nu]
+    - concat_along: [[!dag_prev , !dag_node -2 ], 'type', ['True marginals', 'Prediction']]
+      tag: data
+  col: type
+  cbar_kwargs:
+    label: $\mu_i \nu_j$
+  figsize: [!dag_result two_thirds_width, !dag_result third_width]
+
+## Plot the marginals on the marginals
+#marginals:
+#  based_on:
+#    - .creator.universe
+#    - .plot.facet_grid.density
+#  select:
+#    probabilities:
+#      path: loss
+#      transform:
+#        - .sel: [!dag_prev , {kind: [mu_marginal, nu_marginal]}]
+#        - neg_exp: [!dag_prev ]
+#    pred_mu:
+#      path: mu_marginal
+#      transform: [.data]
+#    pred_nu:
+#      path: nu_marginal
+#      transform: [.data]
+#    true_mu:
+#      path: true_mu
+#      transform: [.data]
+#    true_nu:
+#      path: true_nu
+#      transform: [.data]
+#  transform:
+#
+#    # Get the marginals for mu
+#    - .sel: [!dag_tag probabilities , {kind: mu_marginal}]
+#    - broadcast: [!dag_tag pred_mu, !dag_prev ]
+#    - marginal_from_ds: [ !dag_prev ]
+#      kwargs:
+#        x: x
+#        y: loss
+#        exclude_dim: [ i ]
+#        scale_y_bins: True
+#      tag: marginal_mu
+#
+#    # Get the marginals for nu
+#    - .sel: [!dag_tag probabilities , {kind: nu_marginal}]
+#    - broadcast: [!dag_tag pred_nu, !dag_prev ]
+#    - marginal_from_ds: [ !dag_prev ]
+#      kwargs:
+#        x: x
+#        y: loss
+#        exclude_dim: [ i ]
+#        scale_y_bins: True
+#      tag: marginal_nu
+#    - concat_along: [[!dag_tag marginal_mu, !dag_tag marginal_nu], 'kind', ['mu', 'nu']]
+#    - .coords: [!dag_prev , 'bin_idx']
+#    - concat_along: [[!dag_tag true_mu, !dag_tag true_nu], 'kind', ['mu', 'nu']]
+#    - .expand_dims: [!dag_prev , {bin_idx: !dag_node -2}]
+#    - .to_dataset: [!dag_prev ]
+#      kwargs: {name: 'true_data'}
+#    - xr.merge: [[!dag_node -5, !dag_prev ]]
+#      tag: data
+#  c: !dag_result c_darkblue
+#  x: x
+#  y: marginal
+#  row: kind
+#  col: i
+#  sharex: True
+#  sharey: False
+#  figsize: [!dag_result full_width, !dag_result half_width]
+#  true_data:
+#    lw: 1.0
+#    linestyle: dotted
+#    c: !dag_result c_red
+#  smooth_kwargs:
+#    enabled: True
+#    sigma: 1

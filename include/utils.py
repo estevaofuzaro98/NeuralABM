@@ -19,7 +19,7 @@ def random_tensor(
                 lower: 0
                 upper: 1
 
-    together with `size: (2, 2)` will initialise a 2x2 matrix with entries drawn from a uniform distribution on
+    together with ``size: (2, 2)`` will initialise a 2x2 matrix with entries drawn from a uniform distribution on
     [0, 1]. The configuration
 
     .. code-block::
@@ -48,7 +48,7 @@ def random_tensor(
     ) -> torch.Tensor:
         """Generates a random tensor according to a distribution.
 
-        :param distribution: the type of distribution. Can be 'uniform' or 'normal'.
+        :param distribution: the type of distribution. Can be ``uniform`` or ``normal``.
         :param parameters: the parameters relevant to the respective distribution
         :param s: the size of the random tensor
         """

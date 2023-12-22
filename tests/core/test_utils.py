@@ -14,7 +14,7 @@ sys.path.insert(0, up(up(up(__file__))))
 utils = import_module_from_path(mod_path=up(up(up(__file__))), mod_str="include.utils")
 
 # Load the test config
-CFG_FILENAME = resource_filename("tests", "cfgs/test_utils.yml")
+CFG_FILENAME = resource_filename("tests", "cfgs/utils.yml")
 test_cfg = load_yml(CFG_FILENAME)
 
 
