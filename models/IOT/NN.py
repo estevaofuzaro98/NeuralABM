@@ -206,7 +206,7 @@ class IOT_NN:
                 self.loss_function(T_pred, self.T)
                 + self.loss_function(T_pred.sum(dim=1, keepdim=True), self.mu)
                 + self.loss_function(T_pred.sum(dim=0, keepdim=True), self.nu)
-                + self.loss_function(torch.abs(C_pred).sum(dim=1, keepdim=True), torch.ones(self.M))
+                + self.loss_function(torch.abs(C_pred).sum(dim=1, keepdim=False), torch.ones(self.M))
         )
 
         lossC.backward()

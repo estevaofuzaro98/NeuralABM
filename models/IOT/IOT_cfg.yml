@@ -1,6 +1,4 @@
 Data:
-  load_from_dir:
-    path: /Users/thomasgaskin/utopya_output/IOT/231222-122308/data/uni0/data.h5
   synthetic_data:
 
     # Number of origin and destination zones
