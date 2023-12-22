@@ -16,9 +16,14 @@ This README gives a brief introduction to installation and running a model, as w
 overview of the Utopia syntax. You can find a complete guide on running models with Utopia/utopya
 [here](https://docs.utopia-project.org/html/getting_started/tutorial.html#tutorial).
 
-> **_Warning_**: This package requires `Python >= 3.11`. utopya is also currently only supported on Unix systems (macOS and Ubuntu).
+> [!WARNING]
+> This package requires `Python >= 3.11`. utopya is also currently only supported on Unix systems (macOS and Ubuntu).
 
-> **_Note_**: See the section on [configuration sets](#running-a-model-using-configuration-sets) for guidance on how to reproduce the plots from the
+> [!TIP]
+> If you encounter any difficulties, please [file an issue](https://github.com/ThGaskin/NeuralABM/issues/new).
+
+> [!TIP]
+> See the section on [configuration sets](#running-a-model-using-configuration-sets) for guidance on how to reproduce the plots from the
 > publications, once you have completed installation.
 > - T. Gaskin, G. Pavliotis, M. Girolami. *Neural parameter calibration for large-scale multiagent models.* PNAS **120**, 7, 2023.
 > https://doi.org/10.1073/pnas.2216415120 (`HarrisWilson` and `SIR` models)
@@ -26,12 +31,14 @@ overview of the Utopia syntax. You can find a complete guide on running models w
 > (`Kuramoto` and `HarrisWilsonNW` models)
 > - T. Gaskin, T. Conrad, G. Pavliotis, C. Schütte. *Neural parameter calibration and uncertainty quantification for epidemic
 > forecasting*. https://arxiv.org/abs/2312.03147 (`SIR` and `Covid` models)
-
-> **_Note_**: Since the code is continuously
+>
+> Since the code is continuously
 > being reworked and improved, the plots produced by the current version may quantatively differ from the publication
 > plots. Versions below `v2.0.0` will reproduce the PNAS publication plots.
 
-> **_Note_**: If you encounter any difficulties, please [file an issue](https://github.com/ThGaskin/NeuralABM/issues/new).
+> [!TIP]
+> See the model-specific README files, located at ``<model_name>/README.md``, for guidance on 
+> how to use individual models.
 
 ### Contents of this README
 * [How to install](#how-to-install)
@@ -67,7 +74,8 @@ You should now be able to invoke the utopya CLI:
 utopya --help
 ```
 
-> **_Note_**  Enabling CUDA for PyTorch requires additional packages, e.g. `torchvision` and `torchaudio`.
+> [!NOTE] 
+> Enabling CUDA for PyTorch requires additional packages, e.g. `torchvision` and `torchaudio`.
 > Follow [these](https://pytorch.org/get-started/locally/) instructions to enable GPU training.
 > For Apple Silicon, follow [these](https://PyTorch.org/blog/introducing-accelerated-pytorch-training-on-mac/)
 > installation instructions. Note that GPU acceleration for Apple Silicon is still work in progress and many functions have not
@@ -85,7 +93,8 @@ utopya projects ls
 ```
 Done! 🎉
 
-> **_Note_** Any changes to the project info file need to be communicated to utopya by calling the registration command anew.
+> [!IMPORTANT]
+> Any changes to the project info file need to be communicated to utopya by calling the registration command anew.
 > You will then have to additionally pass the `````--exists-action overwrite````` flag, because a project of that name already exists.
 > See ```utopya projects register --help``` for more information.
 
@@ -168,12 +177,15 @@ You can run the model using this file by calling
 utopya run HarrisWilson path/to/cfg.yml
 ```
 
-> **_Note_**: The models all come with plenty of example configuration files in the `cfgs` folders. These are
+> [!TIP] 
+> The models all come with plenty of example configuration files in the `cfgs` folders. These are
 > *configuration sets*, complete sets of run configurations and evaluation routines designed to produce specific
 > plots. These also demonstrate how to load datasets to run the models.
 
 ## Parameter sweeps
-> **_Note_**: Take a look at the [full tutorial entry](https://docs.utopia-project.org/html/getting_started/tutorial.html#parameter-sweeps)
+
+> [!TIP]
+> Take a look at the [full tutorial entry](https://docs.utopia-project.org/html/getting_started/tutorial.html#parameter-sweeps)
 > for a full guide on running parameter sweeps.
 
 Parameter sweeps (multiple runs using different configuration settings) are easy: all you need to do is add a
@@ -212,7 +224,8 @@ You can run them by executing
 utopya run HarrisWilson --cfg-set <name_of_cfg_set>
 ```
 
-> **_Note_** Some of the configuration sets perform *sweeps*, that is, runs over several parameter configurations.
+> [!NOTE]
+> Some of the configuration sets perform *sweeps*, that is, runs over several parameter configurations.
 > These may take a while to run.
 
 Running the configuration set will produce plots. If you wish to re-evaluate a run (perhaps plotting different figures),
