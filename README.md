@@ -5,7 +5,10 @@
 
 [![CI](https://github.com/ThGaskin/NeuralABM/actions/workflows/pytest.yml/badge.svg)](https://github.com/ThGaskin/NeuralABM/actions/workflows/pytest.yml)
 [![coverage badge](https://thgaskin.github.io/NeuralABM/coverage-badge.svg)](https://thgaskin.github.io/NeuralABM)
-[![Python 3.6](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/release/python-3110/)
+[![Python 3.8](https://img.shields.io/badge/python-3.8-blue.svg)](https://www.python.org/downloads/release/python-380/)
+[![Python 3.9](https://img.shields.io/badge/python-3.9-blue.svg)](https://www.python.org/downloads/release/python-390/)
+[![Python 3.10](https://img.shields.io/badge/python-3.10-blue.svg)](https://www.python.org/downloads/release/python-3100/)
+[![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/release/python-3110/)
 
 This project combines multi-agent models with a neural core to estimate marginal densities on ODE parameters
 (including adjacency matrices) from data. The project
@@ -17,7 +20,7 @@ overview of the Utopia syntax. You can find a complete guide on running models w
 [here](https://docs.utopia-project.org/html/getting_started/tutorial.html#tutorial).
 
 > [!WARNING]
-> This package requires `Python >= 3.11`. utopya is also currently only supported on Unix systems (macOS and Ubuntu).
+> utopya is currently only supported on Unix systems (macOS and Ubuntu).
 
 > [!TIP]
 > If you encounter any difficulties, please [file an issue](https://github.com/ThGaskin/NeuralABM/issues/new).
