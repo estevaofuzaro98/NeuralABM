@@ -89,33 +89,45 @@ def get_data(*, data_cfg: dict, h5group: h5.Group, **kwargs) -> dict:
             # If a sweep over ``time_isel`` is configured, the cost matrix for multiple frames can be learned
             time_isel = data_cfg["load_from_dir"].get("time_isel", None)
 
-            mu = torch.from_numpy(np.array(f["IOT"]["mu"])).float().unsqueeze(-1)
-            nu = torch.from_numpy(np.array(f["IOT"]["nu"])).float().unsqueeze(-2)
+            # Scale the data, if given
+            sf = data_cfg["load_from_dir"].get("scale_factor", 1.0)
 
-            C = torch.from_numpy(np.array(f["IOT"]["C"])).float()
-            T = torch.from_numpy(np.array(f["IOT"]["T"])).float()
+            mu = sf * torch.from_numpy(np.array(f["IOT"]["mu"])).float().unsqueeze(-1)
+            nu = sf * torch.from_numpy(np.array(f["IOT"]["nu"])).float().unsqueeze(-2)
 
-            data = dict(C=C, T=T, mu=mu, nu=nu)
+            C = sf * torch.from_numpy(np.array(f["IOT"]["C"])).float() if "C" in f["IOT"].keys() else None
+            T = sf * torch.from_numpy(np.array(f["IOT"]["T"])).float()
+
+            data = dict(C=C, T=T, mu=mu, nu=nu) if C else dict(T=T, mu=mu, nu=nu)
             if time_isel is not None:
                 data = dict((k, v[time_isel]) for k, v in data.items())
                 data["time_isel"] = time_isel
+
+            data.update(**f["IOT"]["T"].attrs)
+
     else:
         # Load synthetic data
         data = generate_synthetic_data(data_cfg["synthetic_data"], **kwargs)
 
     # Store the data in seperate datasets
-    dset_C = h5group.create_dataset(
-        "C",
-        data["C"].shape,
-        maxshape=data["C"].shape,
-        chunks=True,
-        compression=3,
-        dtype=float,
-    )
-    dset_C.attrs["dim_names"] = ["i", "j"]
-    dset_C.attrs["coords_mode__i"] = "trivial"
-    dset_C.attrs["coords_mode__j"] = "trivial"
-    dset_C[:, :] = data["C"]
+    if "C" in data.keys():
+        dset_C = h5group.create_dataset(
+            "C",
+            data["C"].shape,
+            maxshape=data["C"].shape,
+            chunks=True,
+            compression=3,
+            dtype=float,
+        )
+        dset_C.attrs["dim_names"] = ["i", "j"]
+        dset_C.attrs["coords_mode__i"] = data.get("coords_mode__i", "trivial")
+        if data.get("coords_mode__i", "trivial") == "values":
+            dset_C.attrs["coords__i"] = data["coords__i"]
+        dset_C.attrs["coords_mode__j"] = data.get("coords_mode__j", "trivial")
+        if data.get("coords_mode__j", "trivial") == "values":
+            dset_C.attrs["coords__j"] = data["coords__j"]
+
+        dset_C[:, :] = data["C"]
 
     dset_T = h5group.create_dataset(
         "T",
@@ -126,8 +138,12 @@ def get_data(*, data_cfg: dict, h5group: h5.Group, **kwargs) -> dict:
         dtype=float,
     )
     dset_T.attrs["dim_names"] = ["i", "j"]
-    dset_T.attrs["coords_mode__i"] = "trivial"
-    dset_T.attrs["coords_mode__j"] = "trivial"
+    dset_T.attrs["coords_mode__i"] = data.get("coords_mode__i", "trivial")
+    if data.get("coords_mode__i", "trivial") == "values":
+        dset_T.attrs["coords__i"] = data["coords__i"]
+    dset_T.attrs["coords_mode__j"] = data.get("coords_mode__j", "trivial")
+    if data.get("coords_mode__j", "trivial") == "values":
+        dset_T.attrs["coords__j"] = data["coords__j"]
     dset_T[:, :] = data["T"]
 
     dset_mu = h5group.create_dataset(
@@ -139,7 +155,9 @@ def get_data(*, data_cfg: dict, h5group: h5.Group, **kwargs) -> dict:
         dtype=float,
     )
     dset_mu.attrs["dim_names"] = ["i"]
-    dset_mu.attrs["coords_mode__i"] = "trivial"
+    dset_mu.attrs["coords_mode__i"] = data.get("coords_mode__i", "trivial")
+    if data.get("coords_mode__i", "trivial") == "values":
+        dset_mu.attrs["coords__i"] = data["coords__i"]
     dset_mu[:] = data["mu"].squeeze(-1)
 
     dset_nu = h5group.create_dataset(
@@ -151,7 +169,9 @@ def get_data(*, data_cfg: dict, h5group: h5.Group, **kwargs) -> dict:
         dtype=float,
     )
     dset_nu.attrs["dim_names"] = ["i"]
-    dset_nu.attrs["coords_mode__i"] = "trivial"
+    dset_nu.attrs["coords_mode__i"] = data.get("coords_mode__i", "trivial")
+    if data.get("coords_mode__i", "trivial") == "values":
+        dset_nu.attrs["coords__i"] = data["coords__i"]
     dset_nu[:] = data["nu"].squeeze(-2)
 
     # Return the tensors, which have shapes (M, N) (C), (M, N) (T), (M, 1) (mu), and (1, N) (nu) respectively.

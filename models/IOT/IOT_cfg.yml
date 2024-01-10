@@ -63,6 +63,7 @@ NeuralNetM:
     default: tanh
     layer_specific:
       -1: abs
+  optimizer: Adam
   learning_rate: !is-positive 0.002
   prior:
     distribution: uniform

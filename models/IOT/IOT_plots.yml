@@ -39,7 +39,7 @@ cost_error:
     loss_idx:
       path: loss
       transform:
-        - .sel_with_drop: [!dag_prev , {kind: C}]
+        - .sel_with_drop: [!dag_prev , {kind: T}]
         - .idxmin: [!dag_prev ]
   transform:
     - .sel_with_drop: [!dag_tag prediction, {epoch: !dag_tag loss_idx}]
@@ -96,7 +96,7 @@ marginals:
     loss_idx:
       path: loss
       transform:
-        - .sel_with_drop: [!dag_prev , {kind: C}]
+        - .sel_with_drop: [!dag_prev , {kind: T}]
         - .idxmin: [!dag_prev ]
   transform:
     - .sel_with_drop: [!dag_tag mu, {epoch: !dag_tag loss_idx}]

@@ -1,0 +1,12 @@
+paths:
+  model_note: FAO_data
+parameter_space:
+  num_epochs: 1000
+  IOT:
+    Data:
+      load_from_dir:
+        path: data/IOT/FAOStat/Trade_DetailedTradeMatrix_E_All_Data_Tomatoes_Quantity.h5
+        time_isel: !sweep
+          default: -1
+          range: [-5, 0]
+        scale_factor: 1e-6

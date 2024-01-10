@@ -69,9 +69,9 @@ if __name__ == "__main__":
         h5group=h5group,
         epsilon=model_cfg["Data"].get("epsilon", 1),
     )
-    C, T, mu, nu = training_data["C"], training_data["T"], training_data["mu"], training_data["nu"]
+    C, T, mu, nu = training_data.get("C", None), training_data["T"], training_data["mu"], training_data["nu"]
 
-    M, N = C.shape[0], C.shape[1]
+    M, N = T.shape[0], T.shape[1]
 
     # Initialise the neural networks. Two coupled neural networks are used to estimate the cost matrix and
     # marginals, which are each initialised separately.

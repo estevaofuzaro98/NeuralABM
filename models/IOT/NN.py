@@ -73,6 +73,11 @@ class IOT_NN:
         self.mu, self.nu = training_data["mu"], training_data["nu"]
         self.T = training_data["T"]
 
+        # Masks for the transport plan and marginals
+        self.T_mask = ~torch.isnan(self.T)
+        self.mu_mask = self.mu > 0
+        self.nu_mask = self.nu > 0
+
         # Origin zone and destination zone sizes
         self.N: int = self.T.shape[0]
         self.M: int = self.T.shape[1]
@@ -102,7 +107,7 @@ class IOT_NN:
         self._dset_loss.attrs["coords_mode__epoch"] = "start_and_step"
         self._dset_loss.attrs["coords__epoch"] = [write_start, write_every]
         self._dset_loss.attrs["coords_mode__kind"] = "values"
-        self._dset_loss.attrs["coords__kind"] = ["C", "mu", "nu"]
+        self._dset_loss.attrs["coords__kind"] = ["T", "mu", "nu"]
 
         # Write the computation time of every epoch
         self._dset_time = self._h5group.create_dataset(
@@ -126,7 +131,9 @@ class IOT_NN:
         self._dset_mu.attrs["dim_names"] = ["epoch", "i"]
         self._dset_mu.attrs["coords_mode__epoch"] = "start_and_step"
         self._dset_mu.attrs["coords__epoch"] = [write_start, write_every]
-        self._dset_mu.attrs["coords_mode__i"] = "trivial"
+        self._dset_mu.attrs["coords_mode__i"] = self._h5group["mu"].attrs["coords_mode__i"]
+        if self._h5group["mu"].attrs["coords_mode__i"] == "values":
+            self._dset_mu.attrs["coords__i"] = self._h5group["mu"].attrs["coords__i"]
 
         self._dset_nu = self._h5group.create_dataset(
             "predicted_nu",
@@ -138,7 +145,9 @@ class IOT_NN:
         self._dset_nu.attrs["dim_names"] = ["epoch", "i"]
         self._dset_nu.attrs["coords_mode__epoch"] = "start_and_step"
         self._dset_nu.attrs["coords__epoch"] = [write_start, write_every]
-        self._dset_nu.attrs["coords_mode__i"] = "trivial"
+        self._dset_nu.attrs["coords_mode__i"] = self._h5group["nu"].attrs["coords_mode__i"]
+        if self._h5group["mu"].attrs["coords_mode__i"] == "values":
+            self._dset_nu.attrs["coords__i"] = self._h5group["nu"].attrs["coords__i"]
 
         # Cost matrix
         self._dset_C = self._h5group.create_dataset(
@@ -151,8 +160,12 @@ class IOT_NN:
         self._dset_C.attrs["dim_names"] = ["epoch", "i", "j"]
         self._dset_C.attrs["coords_mode__epoch"] = "start_and_step"
         self._dset_C.attrs["coords__epoch"] = [write_start, write_every]
-        self._dset_C.attrs["coords_mode__i"] = "trivial"
-        self._dset_C.attrs["coords_mode__j"] = "trivial"
+        self._dset_C.attrs["coords_mode__i"] = self._h5group["T"].attrs["coords_mode__i"]
+        self._dset_C.attrs["coords_mode__j"] = self._h5group["T"].attrs["coords_mode__j"]
+        if self._h5group["T"].attrs["coords_mode__i"] == "values":
+            self._dset_C.attrs["coords__i"] = self._h5group["T"].attrs["coords__i"]
+        if self._h5group["T"].attrs["coords_mode__j"] == "values":
+            self._dset_C.attrs["coords__j"] = self._h5group["T"].attrs["coords__j"]
 
         # Transport plan
         self._dset_T = self._h5group.create_dataset(
@@ -165,8 +178,12 @@ class IOT_NN:
         self._dset_T.attrs["dim_names"] = ["epoch", "i", "j"]
         self._dset_T.attrs["coords_mode__epoch"] = "start_and_step"
         self._dset_T.attrs["coords__epoch"] = [write_start, write_every]
-        self._dset_T.attrs["coords_mode__i"] = "trivial"
-        self._dset_T.attrs["coords_mode__j"] = "trivial"
+        self._dset_T.attrs["coords_mode__i"] = self._h5group["T"].attrs["coords_mode__i"]
+        self._dset_T.attrs["coords_mode__j"] = self._h5group["T"].attrs["coords_mode__j"]
+        if self._h5group["T"].attrs["coords_mode__i"] == "values":
+            self._dset_T.attrs["coords__i"] = self._h5group["T"].attrs["coords__i"]
+        if self._h5group["T"].attrs["coords_mode__j"] == "values":
+            self._dset_T.attrs["coords__j"] = self._h5group["T"].attrs["coords__j"]
 
     def epoch(self, *, sinkhorn_kwargs: dict):
         """Trains the model for a single epoch.
@@ -203,9 +220,9 @@ class IOT_NN:
 
         # Train the cost NN to match both the observed transport plan and marginals
         lossC = (
-                self.loss_function(T_pred, self.T)
-                + self.loss_function(T_pred.sum(dim=1, keepdim=True), self.mu)
-                + self.loss_function(T_pred.sum(dim=0, keepdim=True), self.nu)
+                self.loss_function(T_pred[self.T_mask], self.T[self.T_mask])
+                + self.loss_function(T_pred.sum(dim=1, keepdim=True)[self.mu_mask], self.mu[self.mu_mask])
+                + self.loss_function(T_pred.sum(dim=0, keepdim=True)[self.nu_mask], self.nu[self.nu_mask])
                 + self.loss_function(torch.abs(C_pred).sum(dim=1, keepdim=False), torch.ones(self.M))
         )
 
@@ -216,21 +233,23 @@ class IOT_NN:
         # Train the marginal NN to match the observed marginals and the marginals from the
         # predicted cost matrix
         lossM = (
-                self.loss_function(mu_pred, self.mu)
-                + self.loss_function(nu_pred, self.nu)
-                + self.loss_function(mu_pred, self.T.sum(dim=1, keepdim=True))
-                + self.loss_function(nu_pred, self.T.sum(dim=0, keepdim=True))
+                self.loss_function(mu_pred[self.mu_mask], self.mu[self.mu_mask])
+                + self.loss_function(nu_pred[self.nu_mask], self.nu[self.nu_mask])
+                + self.loss_function(mu_pred[self.mu_mask], torch.nansum(self.T, dim=1, keepdim=True)[self.mu_mask])
+                + self.loss_function(nu_pred[self.nu_mask], torch.nansum(self.T, dim=0, keepdim=True)[self.nu_mask])
         )
+
         lossM.backward()
+
         self.neural_netM.optimizer.step()
         self.neural_netM.optimizer.zero_grad()
 
         # Write the data
         self.current_loss = torch.tensor(
             [
-                self.loss_function(T_pred, self.T),
-                self.loss_function(mu_pred, self.mu),
-                self.loss_function(nu_pred, self.nu),
+                self.loss_function(T_pred[~torch.isnan(self.T)], self.T[~torch.isnan(self.T)]),
+                self.loss_function(mu_pred[self.mu_mask], self.mu[self.mu_mask]),
+                self.loss_function(nu_pred[self.nu_mask], self.nu[self.nu_mask]),
             ]
         )
         self.current_marginals = torch.cat(
@@ -250,7 +269,6 @@ class IOT_NN:
         data is always in the last row of the dataset.
         """
         if self._time >= self._write_start and (self._time % self._write_every == 0):
-
             # Write the loss
             self._dset_loss.resize(self._dset_loss.shape[0] + 1, axis=0)
             self._dset_loss[-1, :] = self.current_loss
@@ -260,8 +278,8 @@ class IOT_NN:
             self._dset_mu[-1, :] = self.current_marginals[0: self.M]
             self._dset_nu.resize(self._dset_nu.shape[0] + 1, axis=0)
             self._dset_nu[-1, :] = self.current_marginals[
-                                            self.M: self.M + self.N
-                                            ]
+                                   self.M: self.M + self.N
+                                   ]
 
             # Write the cost matrix
             self._dset_C.resize(self._dset_C.shape[0] + 1, axis=0)
