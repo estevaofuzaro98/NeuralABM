@@ -92,18 +92,29 @@ def get_data(*, data_cfg: dict, h5group: h5.Group, **kwargs) -> dict:
             # Scale the data, if given
             sf = data_cfg["load_from_dir"].get("scale_factor", 1.0)
 
-            mu = sf * torch.from_numpy(np.array(f["IOT"]["mu"])).float().unsqueeze(-1)
-            nu = sf * torch.from_numpy(np.array(f["IOT"]["nu"])).float().unsqueeze(-2)
+            # Get the keys for the different datasets, if provided
+            T_key = data_cfg["load_from_dir"].get("T", "T")
+            C_key = data_cfg["load_from_dir"].get("C", "C")
+            mu_key = data_cfg["load_from_dir"].get("mu", "mu")
+            nu_key = data_cfg["load_from_dir"].get("nu", "nu")
 
-            C = sf * torch.from_numpy(np.array(f["IOT"]["C"])).float() if "C" in f["IOT"].keys() else None
-            T = sf * torch.from_numpy(np.array(f["IOT"]["T"])).float()
+            mu = sf * torch.from_numpy(np.array(f["IOT"][mu_key])).float().unsqueeze(-1)
+            nu = sf * torch.from_numpy(np.array(f["IOT"][nu_key])).float().unsqueeze(-2)
+
+            # The cost matrix may not be available and can be skipped
+            # Cost matrix is unaffected by scaling of T and marginals
+            C = torch.from_numpy(np.array(f["IOT"][C_key])).float() if C_key in f["IOT"].keys() else None
+            if C is None:
+                log.debug("No cost matrix found in dataset.")
+
+            T = sf * torch.from_numpy(np.array(f["IOT"][T_key])).float()
 
             data = dict(C=C, T=T, mu=mu, nu=nu) if C else dict(T=T, mu=mu, nu=nu)
             if time_isel is not None:
                 data = dict((k, v[time_isel]) for k, v in data.items())
                 data["time_isel"] = time_isel
 
-            data.update(**f["IOT"]["T"].attrs)
+            data.update(**f["IOT"][T_key].attrs)
 
     else:
         # Load synthetic data

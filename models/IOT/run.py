@@ -109,7 +109,7 @@ if __name__ == "__main__":
     num_epochs = cfg["num_epochs"]
     log.info(f"   Now commencing training for {num_epochs} epochs ...")
     for i in range(num_epochs):
-        model.epoch(sinkhorn_kwargs=model_cfg["Training"]["Sinkhorn_kwargs"])
+        model.epoch(sinkhorn_kwargs=model_cfg["Training"]["Sinkhorn_kwargs"], iteration=i)
         log.progress(
             f"   Completed epoch {i + 1} / {num_epochs}; "
             f"   current loss: {model.current_loss}"

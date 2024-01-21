@@ -74,7 +74,7 @@ class IOT_NN:
         self.T = training_data["T"]
 
         # Masks for the transport plan and marginals
-        self.T_mask = ~torch.isnan(self.T)
+        self.T_mask = self.T > 0
         self.mu_mask = self.mu > 0
         self.nu_mask = self.nu > 0
 
@@ -185,11 +185,11 @@ class IOT_NN:
         if self._h5group["T"].attrs["coords_mode__j"] == "values":
             self._dset_T.attrs["coords__j"] = self._h5group["T"].attrs["coords__j"]
 
-    def epoch(self, *, sinkhorn_kwargs: dict):
+    def epoch(self, *, sinkhorn_kwargs: dict, iteration: int = None):
         """Trains the model for a single epoch.
 
         :param sinkhorn_kwargs: passed to the numerical solver (Sinkhorn algorithm)
-
+        :param iteration: (optional) iteration count (for debugging purposes)
         """
 
         # Get a sample for the cost matrix

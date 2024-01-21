@@ -1,12 +1,25 @@
 paths:
-  model_note: FAO_data
+  model_note: Avocados
+perform_sweep: True
 parameter_space:
-  num_epochs: 1000
+  num_epochs: 2500
+  write_every: 15
+  write_start: 1
   IOT:
     Data:
       load_from_dir:
-        path: data/IOT/FAOStat/Trade_DetailedTradeMatrix_E_All_Data_Tomatoes_Quantity.h5
+        path: /Users/thomasgaskin/Downloads/FAOSTAT_data/Avocados/Avocados_Quantity.h5
+        T: !sweep
+          default: "T_A"
+          values: ["T_A", "T_B"]
+        mu: !sweep
+          default: "mu_A"
+          values: ["mu_A", "mu_B"]
+        nu: !coupled-sweep
+          default: "nu_A"
+          values: ["nu_A", "nu_B"]
+          target_name: mu
         time_isel: !sweep
           default: -1
-          range: [-5, 0]
-        scale_factor: 1e-6
+          range: [-10, 0]
+        scale_factor: 1e-5

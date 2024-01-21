@@ -157,7 +157,7 @@ cost_over_time:
       prediction:
         path: predicted_C
         transform:
-          - .sel_with_drop: [!dag_prev , {j: 'UK', i: ['Netherlands', 'Spain', 'Morocco']}]
+          - .sel_with_drop: [!dag_prev , {j: 'UK', i: ['Netherlands', 'Spain', 'Morocco', 'New Zealand', 'Germany']}]
       loss:
         path: loss
         transform:
@@ -170,6 +170,9 @@ cost_over_time:
     - broadcast: [!dag_tag prediction, !dag_prev ]
     - marginal_from_ds: [!dag_prev ]
       kwargs: {x: x, y: loss, along_dim: [epoch]}
+      file_cache:
+        read: True
+        write: True
       tag: marginal
     - mean: [!dag_prev ]
       kwargs: {x: x, y: y, along_dim: [bin_idx]}
@@ -186,18 +189,19 @@ cost_over_time:
   x: time_isel
   y: y
   yerr: yerr
+  hue: i
   helpers:
-    set_labels:
-      x: Year
-      y: Relative import cost
-    set_legend:
-      title: 'Origin'
-    set_title:
-      title: Tomato import cost to UK
+#    set_labels:
+#      x: Year
+#      y: Relative import cost
+#    set_legend:
+#      title: 'Origin'
+    set_suptitle:
+      title: Vegetable import cost to UK
     set_ticks:
       x:
         major:
-          locs: [-1, -2, -3, -4, -5]
-          labels: [2021, 2020, 2019, 2018, 2017]
+          locs: [-1, -2, -3, -4, -5, -6, -7, -8, -9, -10]
+          labels: [2021, 2020, 2019, 2018, 2017, 2016, 2015, 2014, 2013, 2012]
   style:
     figure.figsize: [!dag_result half_width, !dag_result half_width]
