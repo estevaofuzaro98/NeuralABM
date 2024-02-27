@@ -20,6 +20,11 @@
         - .sel: [!arg 0, !arg 1]
           kwargs: {drop: True}
 
+      # Divide by median
+      divide_by_median:
+        - .median: [ !arg 0 , !arg 1 ]
+        - div: [ !arg 0, !dag_prev ]
+
 .default_style:
   dag_visualization:
     enabled: False
@@ -58,13 +63,13 @@
         - mul: [!dag_prev , 2]
 
   style:
-    text.usetex:        False   # Set to 'True' to use latex
+    text.usetex:        True   # Set to 'True' to use latex
     mathtext.fontset:   cm
-    font.family:        Helvetica
+    font.family:        serif
     text.latex.preamble: \usepackage{amssymb} \usepackage{amsmath}
 
     # Set the label fontsize
-    font.size:          &fontsize 7
+    font.size:          &fontsize 9
     axes.titlesize:     *fontsize
     axes.labelsize:     *fontsize
     xtick.labelsize:    *fontsize
@@ -73,11 +78,11 @@
     grid.linewidth:     0.5
     savefig.bbox:       tight
     axes.prop_cycle: !format
-      fstr: "cycler('color', ['{colors[c_lightgreen]:}',
+      fstr: "cycler('color', ['{colors[c_darkblue]:}',
                               '{colors[c_red]:}',
                               '{colors[c_darkgreen]:}',
                               '{colors[c_lightblue]:}',
-                              '{colors[c_darkblue]:}',
+                              '{colors[c_lightgreen]:}',
                               '{colors[c_lightbrown]:}',
                               '{colors[c_orange]:}',
                               '{colors[c_yellow]:}',
@@ -111,6 +116,30 @@
       0: white
       0.5: !dag_result c_yellow
       1: !dag_result c_red
+    continuous: True
+
+.cmap_YeOrRe:
+  cmap:
+    from_values:
+      0: !dag_result c_yellow
+      0.5: !dag_result c_orange
+      1: !dag_result c_red
+    continuous: True
+
+.cmap_reds:
+  cmap:
+    from_values:
+      0: !dag_result c_orange
+      0.5: !dag_result c_red
+      1: !dag_result c_purple
+    continuous: True
+
+.cmap_blues:
+  cmap:
+    from_values:
+      0: !dag_result c_yellow
+      0.5: !dag_result c_lightblue
+      1: !dag_result c_darkblue
     continuous: True
 
 .hlpr.no_labels:

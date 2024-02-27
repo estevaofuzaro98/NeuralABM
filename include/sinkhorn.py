@@ -33,8 +33,15 @@ def Sinkhorn(
 
     # Initial values: vector of ones
     _m = torch.ones_like(a)
-    _m.requires_gradient = requires_gradient
     _n = torch.ones_like(b)
+
+    # Normalise one of the constraints
+    _norm_m = torch.norm(_m)
+    _n *= _norm_m
+    _m /= _norm_m
+
+    # Set tracking requirement
+    _m.requires_gradient = requires_gradient
     _n.requires_gradient = requires_gradient
 
     # Exponential of cost matrix. The transport plan is given by diag(m) * T * diag(n).
@@ -52,6 +59,11 @@ def Sinkhorn(
         _m_prev = _m.clone().detach()
         _n = b / torch.matmul(_T.transpose(0, 1), _m).transpose(0, 1)
         _m = a / torch.matmul(_T, _n.transpose(0, 1))
+
+        _norm_m = torch.norm(_m)
+        _m = _m / _norm_m
+        _n = _n * _norm_m
+
         _iter += 1
 
         # Calculate the difference between successive guesses
@@ -67,8 +79,8 @@ def Sinkhorn(
         return _m, _n
 
 
-def marginals_and_transport_plan(mu: torch.Tensor,
-                                 nu: torch.Tensor,
+def marginals_and_transport_plan(alpha: torch.Tensor,
+                                 beta: torch.Tensor,
                                  C: torch.Tensor,
                                  *,
                                  epsilon: Union[torch.Tensor, float]
@@ -76,17 +88,19 @@ def marginals_and_transport_plan(mu: torch.Tensor,
     """ Calculates the marginals and transport plan from a cost matrix and marginal constraint diagonals
     (Sinkhorn output).
 
-    :param mu: first marginal constraint
-    :param nu: second marginal constraint
+    :param alpha: first scaling factor (Lagrangian multiplier)
+    :param beta: second scaling factor (Lagrangian multiplier)
     :param C: cost matrix
     :param epsilon: entropy regularisation
     :returns: tuple of marginals and transport plan
     """
 
     # Predicted transport plan
+    norm_alpha, norm_beta = torch.norm(alpha), torch.norm(beta)
+
     T_pred = torch.matmul(
-        torch.matmul(torch.diag(mu.flatten()), torch.exp(- C / epsilon)), torch.diag(nu.flatten())
-    )
+        torch.matmul(torch.diag(alpha.flatten() / norm_alpha), torch.exp(- C / epsilon)), torch.diag(beta.flatten() / norm_beta)
+    ) * (norm_alpha * norm_beta)
 
     # Predicted marginals
     mu_pred, nu_pred = T_pred.sum(dim=1, keepdim=True), T_pred.sum(dim=0, keepdim=True)

@@ -113,6 +113,25 @@ def sel_matrix_indices(
     A = A.isel(i=(indices["i"]), j=(indices["j"]))
     return A.drop_vars(["i", "j"]) if drop else A
 
+@is_operation("sel_random_matrix_entries")
+@apply_along_dim
+def sel_random_matrix_entries(
+    A: xr.DataArray, n: int, drop: bool = False
+) -> xr.DataArray:
+    """Selects n random entries from an adjacency matrix A. If specified, coordinate labels
+    are dropped.
+
+    :param A: adjacency matrix with rows and columns labelled ``i`` and ``j``
+    :param n: number of entries to select
+    :param drop: whether to drop the ``i`` and ``j`` coordinate labels
+    :return: selected entries of ``A``
+    """
+    res = []
+    for _n in range(n):
+        _i, _j = np.random.randint(len(A.coords["i"])), np.random.randint(len(A.coords["j"]))
+        res.append(A.isel(i=_i, j=_j, drop=drop).expand_dims({'idx': [_n]}))
+
+    return xr.concat(res, 'idx')
 
 @is_operation("largest_entry_indices")
 @apply_along_dim
@@ -157,6 +176,7 @@ def marginal_distribution(
     probabilities: xr.DataArray,
     true_values: xr.DataArray = None,
     *,
+    bin_coord: str = "x",
     y: str = "MLE",
     yerr: str = "std",
     **kwargs,
@@ -169,6 +189,7 @@ def marginal_distribution(
     :param predictions: 2D ``xr.DataArray`` of predictions; indexed by sample dimension and bin dimension
     :param probabilities: 1D ``xr.DataArray`` of probabilities, indexed by sample dimension
     :param true_values: (optional) 1D ``xr.DataArray`` of true distributions, indexed by bin dimension
+    :param bin_coord: (optional) name of the x-dimension; default is 'x'
     :param y: statistic to calculate for the y variable; default is the maximum likelihood estimator, can also be the
         ``mean``
     :param yerr: error statistic to use for the y variable; default is the standard deviation (std), but can also be
@@ -178,16 +199,16 @@ def marginal_distribution(
         passed, also contains a ``type`` dimension.
     """
 
-    # Temporarily rename the 'x' dimension to avoid naming conflicts with the marginal operation,
-    # which also produces 'x' values
-    predictions = predictions.rename({"x": "_x"})
+    # Temporarily rename the 'x' dimension to avoid potential naming conflicts with the marginal operation,
+    # which also produces 'x' values. This is only strictly necessary if the x-dimension is called 'x'.
+    predictions = predictions.rename({bin_coord: f"_{bin_coord}"})
 
     # Broadcast the predictions and probabilities together
     predictions_and_loss = broadcast(predictions, probabilities, x="y", p="prob")
 
     # Calculate the distribution marginal for each bin
     marginals = marginal_from_ds(
-        predictions_and_loss, x="y", y="prob", exclude_dim=["_x"], **kwargs
+        predictions_and_loss, x="y", y="prob", exclude_dim=[f"_{bin_coord}"], **kwargs
     )
 
     # Calculate the y-statistic: mode (default) or mean
@@ -195,7 +216,7 @@ def marginal_distribution(
         p_max = probabilities.idxmax()
         _y_vals = predictions.sel({p_max.name: p_max.data}, drop=True)
     elif y == "mean":
-        _y_vals = mean(marginals, along_dim=["bin_idx"], x="x", y="y")
+        _y_vals = mean(marginals, along_dim=["bin_idx"], x="x", y="y")["mean"]
 
     # Calculate the standard deviation from y
     _y_err_vals: xr.DataArray = stat_function(
@@ -207,7 +228,7 @@ def marginal_distribution(
         _y_err_vals /= 2
 
     # Combine y and yerr values into a single dataset and rename the 'x' dimension
-    res = xr.Dataset(dict(y=_y_vals, yerr=_y_err_vals)).rename({"_x": "x"})
+    res = xr.Dataset(dict(y=_y_vals, yerr=_y_err_vals)).rename({f"_{bin_coord}": bin_coord})
 
     # If the true values were given, add to the dataset. The true values naturally have zero error.
     if true_values is not None:
@@ -215,7 +236,7 @@ def marginal_distribution(
         # but might be different because of precision errors
         true_values = xr.Dataset(
             dict(y=true_values, yerr=0 * true_values)
-        ).assign_coords({"x": res.coords["x"]})
+        ).assign_coords({bin_coord: res.coords[bin_coord]})
         res = concat([res, true_values], "type", [y, "True values"])
 
     return res

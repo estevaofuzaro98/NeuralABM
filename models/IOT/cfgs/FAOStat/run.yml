@@ -1,0 +1,22 @@
+paths:
+  model_note: Avocados
+perform_sweep: True
+parameter_space:
+  num_epochs: 10000
+  write_every: 15
+  write_start: 1
+  seed: !sweep
+    default: 0
+    range: [10]
+  IOT:
+    Data:
+      load_from_dir:
+        path: data/IOT/FAOStat/Avocados_Quantity_2012-2021.h5
+        T: T_B
+        mu: mu_A
+        nu: nu_A
+        time_isel: !sweep
+          default: 0
+          range: [10]
+          name: Year
+        scale_factor: 1e-5

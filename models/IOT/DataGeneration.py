@@ -109,7 +109,7 @@ def get_data(*, data_cfg: dict, h5group: h5.Group, **kwargs) -> dict:
 
             T = sf * torch.from_numpy(np.array(f["IOT"][T_key])).float()
 
-            data = dict(C=C, T=T, mu=mu, nu=nu) if C else dict(T=T, mu=mu, nu=nu)
+            data = dict(C=C, T=T, mu=mu, nu=nu) if C is not None else dict(T=T, mu=mu, nu=nu)
             if time_isel is not None:
                 data = dict((k, v[time_isel]) for k, v in data.items())
                 data["time_isel"] = time_isel

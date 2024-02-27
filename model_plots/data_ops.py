@@ -189,8 +189,9 @@ def stat_function(
     elif stat == "mode":
         # Get the index of the mode and select it
         idx_max = np.argmax(_y_vals.data, **kwargs)
-        mode_x = _x_vals[idx_max]
-        mode_y = _y_vals[idx_max]
+        mode_x = _x_vals[idx_max].item()
+        mode_y = _y_vals[idx_max].item()
+
         return xr.Dataset(data_vars=dict(mode_x=mode_x, mode_y=mode_y))
 
     # ------------------------------------------------------------------------------------------------------------------
@@ -758,6 +759,10 @@ def marginal_from_ds(
     **kwargs,
 ) -> xr.Dataset:
     """Computes the marginal from a single dataset with x and y given as variables."""
+    if any(np.isnan(ds[x].data)):
+        print('x', ds[x])
+    if any(np.isnan(ds[y].data)):
+        print('y', ds[y])
     return marginal(ds[x], ds[y], bins, ranges, **kwargs)
 
 

@@ -1,0 +1,147 @@
+# Plot the different kinds of loss
+loss:
+  based_on: loss
+
+# Plot the cost matrix with the lowest loss (mode of distribution)
+cost:
+  based_on:
+    - .creator.universe
+    - .matrix
+    - .cmap_blues
+  select:
+    prediction:
+      path: predicted_C
+      transform:
+        - .isel_with_drop: [!dag_prev , {epoch: -1}]
+    true_cost:
+      path: C
+      transform: [.data]
+  transform:
+    - sub: [!dag_tag true_cost, !dag_tag prediction ]
+    - np.abs: [!dag_prev ]
+    - concat_along: [[!dag_tag true_cost, !dag_tag prediction ], 'type', ['True cost', 'Prediction']]
+      tag: data
+  col: type
+  cbar_kwargs:
+    label: $C_{ij}$
+  figsize: [!dag_result two_thirds_width, !dag_result third_width]
+  helpers:
+    setup_figure:
+      ncols: 2
+    axis_specific:
+      0:
+        axis: [0, 0]
+        set_title:
+          title: True cost $\mathbf{C}$
+      1:
+        axis: [ 1, 0 ]
+        set_title:
+          title: MLE $\hat{\mathbf{C}}$
+# Plot the L1 error on the mode of the prediction
+cost_error:
+  based_on:
+    - .creator.universe
+    - .matrix
+    - .cmap_reds
+  select:
+    prediction:
+      path: predicted_C
+    true_cost:
+      path: C
+      transform: [.data]
+    loss_idx:
+      path: loss
+      transform:
+        - .sel_with_drop: [!dag_prev , {kind: T}]
+        - .idxmin: [!dag_prev ]
+  transform:
+    - .sel_with_drop: [!dag_tag prediction, {epoch: !dag_tag loss_idx}]
+    - sub: [!dag_tag true_cost, !dag_prev ]
+    - np.abs: [!dag_prev ]
+#    - div: [!dag_prev , !dag_tag true_cost]
+      tag: data
+    - .mean: [!dag_prev ]
+    - print: [!dag_prev ]
+      tag: mean
+  compute_only: [data, mean]
+  cbar_kwargs:
+    label: $\vert \hat{C}_{ij} - C_{ij}\vert$
+  norm:
+    name: LogNorm
+  helpers:
+    set_title:
+      title: $L^1$ error
+  style:
+    figure.figsize: [ !dag_result third_width, !dag_result third_width ]
+
+# Plot the marginals
+marginals:
+  based_on:
+    - .creator.universe
+    - .plot.facet_grid.density
+  select:
+    mu:
+      path: predicted_mu
+      transform: [.data]
+    nu:
+      path: predicted_nu
+      transform: [.data]
+    true_mu:
+      path: mu
+      transform: [.data]
+    true_nu:
+      path: nu
+      transform: [.data]
+    loss:
+      path: loss
+      transform:
+        - .sel: [!dag_prev , {kind: mu}]
+        - divide_by_median: [!dag_prev , "epoch" ]
+        - neg_exp: [!dag_prev ]
+  transform:
+    - marginal_distribution: [!dag_tag mu, !dag_tag loss , !dag_tag true_mu ]
+      kwargs:
+        bin_coord: i
+      tag: data_mu
+    - marginal_distribution: [!dag_tag nu, !dag_tag loss , !dag_tag true_nu ]
+      kwargs:
+        bin_coord: i
+      tag: data_nu
+    - concat_along: [[!dag_tag data_mu, !dag_tag data_nu ], 'marginal', ['mu', 'nu']]
+    - .fillna: [!dag_prev , 0]
+      tag: data
+  x: i
+  y: y
+  yerr: yerr
+  hue: type
+  col: marginal
+  sharex: False
+  linestyle: [solid, dotted]
+  smooth_kwargs:
+    enabled: True
+    smoothing: 1.0
+  figsize: [ !dag_result full_width, !dag_result third_width ]
+  add_legend: False
+  helpers:
+    setup_figure:
+      ncols: 2
+    set_labels:
+      x: ''
+      y: ''
+    set_tick_locators:
+      x:
+        major:
+          name: MaxNLocator
+          integer: True
+    axis_specific:
+      0:
+        axis: [0, 0]
+        set_legend:
+          custom_labels: [Prediction, True marginal]
+          handlelength: 1.5
+        set_title:
+          title: $\boldsymbol{\mu}$ marginal
+      1:
+        axis: [ 1, 0 ]
+        set_title:
+          title: $\boldsymbol{\nu}$ marginal

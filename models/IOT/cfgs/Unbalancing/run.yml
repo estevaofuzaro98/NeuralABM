@@ -1,0 +1,46 @@
+paths:
+  model_note: Unbalancing
+perform_sweep: True
+parameter_space:
+  num_epochs: 6000
+  seed: !sweep
+    default: 0
+    range: [10]
+  IOT:
+    Data:
+      load_from_dir:
+        path: !sweep
+          default: /Users/thomasgaskin/utopya_output/IOT/240222-155012_Unbalancing/data/uni1/data.h5
+          values: [
+            /Users/thomasgaskin/utopya_output/IOT/240222-205616_Unbalancing/data/uni3/data.h5,
+            /Users/thomasgaskin/utopya_output/IOT/240222-205616_Unbalancing/data/uni5/data.h5,
+            /Users/thomasgaskin/utopya_output/IOT/240222-205616_Unbalancing/data/uni7/data.h5
+          ]
+          name: sigma
+#      synthetic_data:
+#        M: 20
+#        N: 20
+#
+#        # Unbalancing std for the marginals
+#        unbalancing:
+#          mu: !sweep
+#            default: 1
+#            values: [1, 15, 50]
+#            name: sigma
+#          nu: !coupled-sweep
+#            default: 1
+#            values: [1, 15, 50]
+#            target_name: sigma
+
+    NeuralNetC:
+      prior:
+        distribution: uniform
+        parameters:
+          lower: 0
+          upper: 0.2
+    NeuralNetM:
+      prior:
+        distribution: uniform
+        parameters:
+          lower: 50
+          upper: 100

@@ -1,0 +1,9 @@
+paths:
+  model_note: Synthetic_example
+parameter_space:
+  num_epochs: 8000
+  IOT:
+    Data:
+      synthetic_data:
+        M: 20
+        N: 20

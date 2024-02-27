@@ -74,13 +74,13 @@ class IOT_NN:
         self.T = training_data["T"]
 
         # Masks for the transport plan and marginals
-        self.T_mask = self.T > 0
-        self.mu_mask = self.mu > 0
-        self.nu_mask = self.nu > 0
+        self.T_mask = self.T >= 0
+        self.mu_mask = self.mu >= 0
+        self.nu_mask = self.nu >= 0
 
         # Origin zone and destination zone sizes
-        self.N: int = self.T.shape[0]
-        self.M: int = self.T.shape[1]
+        self.M: int = self.T.shape[0]
+        self.N: int = self.T.shape[1]
         self.epsilon: torch.tensor = torch.tensor(epsilon, dtype=torch.float)
 
         # Store the current predictions
@@ -153,7 +153,7 @@ class IOT_NN:
         self._dset_C = self._h5group.create_dataset(
             "predicted_C",
             (0, self.M, self.N),
-            maxshape=(None, self.N, self.M),
+            maxshape=(None, self.M, self.N),
             chunks=True,
             compression=3,
         )
@@ -171,7 +171,7 @@ class IOT_NN:
         self._dset_T = self._h5group.create_dataset(
             "predicted_T",
             (0, self.M, self.N),
-            maxshape=(None, self.N, self.M),
+            maxshape=(None, self.M, self.N),
             chunks=True,
             compression=3,
         )
@@ -216,14 +216,15 @@ class IOT_NN:
             epsilon=self.epsilon,
             **sinkhorn_kwargs,
         )
+
         _, _, T_pred = base.marginals_and_transport_plan(m, n, C_pred, epsilon=self.epsilon)
 
         # Train the cost NN to match both the observed transport plan and marginals
         lossC = (
-                self.loss_function(T_pred[self.T_mask], self.T[self.T_mask])
-                + self.loss_function(T_pred.sum(dim=1, keepdim=True)[self.mu_mask], self.mu[self.mu_mask])
-                + self.loss_function(T_pred.sum(dim=0, keepdim=True)[self.nu_mask], self.nu[self.nu_mask])
-                + self.loss_function(torch.abs(C_pred).sum(dim=1, keepdim=False), torch.ones(self.M))
+                self.loss_function(T_pred[self.T_mask], self.T[self.T_mask]) /self.T.nansum()
+                + self.loss_function(T_pred.sum(dim=1, keepdim=True)[self.mu_mask], self.mu[self.mu_mask]) /(self.N*self.mu.nansum())
+                + self.loss_function(T_pred.sum(dim=0, keepdim=True)[self.nu_mask], self.nu[self.nu_mask]) /(self.M*self.nu.nansum())
+                + self.loss_function(torch.abs(C_pred).sum(dim=1, keepdim=False), torch.ones(self.M)) /self.T.nansum()
         )
 
         lossC.backward()

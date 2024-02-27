@@ -36,11 +36,11 @@ Data:
 
 # Neural network for the cost matrix
 NeuralNetC:
-  num_layers: 3
+  num_layers: 1
   nodes_per_layer:
     default: 20
   biases:
-    default: ~
+    default: [-1, 1]
   activation_funcs:
     default: tanh
     layer_specific:
@@ -54,11 +54,11 @@ NeuralNetC:
 
 # Neural network for the marginals
 NeuralNetM:
-  num_layers: 3
+  num_layers: 1
   nodes_per_layer:
     default: 20
   biases:
-    default: ~
+    default: [-1, 1]
   activation_funcs:
     default: tanh
     layer_specific:

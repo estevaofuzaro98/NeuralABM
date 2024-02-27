@@ -1,0 +1,734 @@
+# Plot the different kinds of loss
+loss:
+  based_on:
+    - .creator.multiverse
+    - .plot.facet_grid.errorbands
+  select_and_combine:
+    fields:
+      loss: loss
+  transform:
+    - .mean: [!dag_tag loss, 'seed']
+    - .std: [!dag_tag loss, 'seed']
+    - xr.Dataset:
+      - y: !dag_node -2
+        yerr: !dag_prev
+    - .assign_coords: [!dag_prev , {Year: [2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021]}]
+      tag: data
+  x: epoch
+  y: y
+  yerr: yerr
+  hue: kind
+  col: Year
+  col_wrap: 4
+  sharey: False
+  helpers:
+    set_scales:
+      x: log
+      y: log
+
+# Plot the marginals
+marginals:
+  based_on:
+    - .creator.multiverse
+    - .plot.facet_grid.density
+  select_and_combine:
+    fields:
+      mu:
+        path: predicted_mu
+        transform: [.data]
+      nu:
+        path: predicted_nu
+        transform: [.data]
+      true_mu:
+        path: mu
+        transform: [.data]
+      true_nu:
+        path: nu
+        transform: [.data]
+      loss:
+        path: loss
+
+  transform:
+
+    # Marginal in mu
+    - .isel_with_drop: [!dag_tag true_mu, {seed: 0}]
+      tag: true_mu_flattened
+    - .sel: [!dag_tag loss, {kind: mu}]
+    - flatten_dims: [!dag_prev ]
+      kwargs:
+        dims: { batch: [ seed, epoch ] }
+    - divide_by_median: [!dag_prev , "batch" ]
+    - neg_exp: [!dag_prev ]
+      tag: prob_mu
+    - flatten_dims: [!dag_tag mu]
+      kwargs:
+        dims: { batch: [ seed, epoch]}
+    - marginal_distribution: [!dag_prev , !dag_tag prob_mu , !dag_tag true_mu_flattened ]
+      kwargs:
+        bin_coord: i
+        exclude_dim: [Year]
+      tag: data_mu
+
+    - .isel_with_drop: [!dag_tag true_nu, {seed: 0}]
+      tag: true_nu_flattened
+    - .sel: [!dag_tag loss, {kind: nu}]
+    - flatten_dims: [!dag_prev ]
+      kwargs:
+        dims: { batch: [ seed, epoch ] }
+    - divide_by_median: [!dag_prev , "batch" ]
+    - neg_exp: [!dag_prev ]
+      tag: prob_nu
+    - flatten_dims: [!dag_tag nu]
+      kwargs:
+        dims: { batch: [ seed, epoch]}
+    - marginal_distribution: [!dag_prev , !dag_tag prob_nu , !dag_tag true_nu_flattened ]
+      kwargs:
+        bin_coord: i
+        exclude_dim: [Year]
+      tag: data_nu
+
+    - concat_along: [[!dag_tag data_mu, !dag_tag data_nu ], 'marginal', ['$\boldsymbol{\mu}$', '$\boldsymbol{\nu}$']]
+    - .fillna: [!dag_prev , 0]
+    - .assign_coords: [!dag_prev , {Year: [2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021]}]
+      file_cache:
+        write: True
+        read: True
+      tag: marginals
+    - .sel: [!dag_tag marginals , {Year: [2020, 2021]}]
+    - .assign_coords: [!dag_prev , {i: !range [165]}]
+      tag: data
+  x: i
+  y: y
+  yerr: yerr
+  hue: type
+  col: Year
+  row: marginal
+  sharex: False
+  sharey: True
+  linestyle: [solid, dotted]
+  smooth_kwargs:
+    enabled: False
+    smoothing: 1.0
+  figsize: [ !dag_result full_width, !dag_result half_width ]
+  add_legend: False
+  helpers:
+    set_labels:
+      x: ''
+      y: ''
+    set_scales:
+      y: log
+    set_limits:
+      y: [1e-4, ~]
+    set_ticks:
+      x:
+        major:
+          locs: []
+    axis_specific:
+      0:
+        axis: [0, 0]
+        set_legend:
+          custom_labels: [Prediction, True marginal]
+          handlelength: 1.5
+
+# Export costs from Mexico
+cost_Mexico:
+  based_on:
+    - .creator.multiverse
+    - .plot.facet_grid.errorbands
+    - .plot.facet_grid.with_auto_encoding
+  select_and_combine:
+    fields:
+      prediction:
+        path: predicted_C
+        transform:
+          - .sel_with_drop: [!dag_prev , {i: 'Mexico', j: [USA, Germany, Canada, UK, Australia, Japan]}]
+      loss:
+        path: loss
+        transform:
+          - .sel_with_drop: [!dag_prev , {kind: T}]
+  transform:
+    - flatten_dims: [!dag_tag loss ]
+      kwargs:
+        dims: { batch: [ seed, epoch ] }
+    - divide_by_median: [!dag_prev , "batch" ]
+    - neg_exp: [!dag_prev ]
+      tag: probability
+
+    - flatten_dims: [!dag_tag prediction]
+      kwargs:
+        dims: { batch: [ seed, epoch]}
+    - broadcast: [!dag_prev , !dag_tag probability ]
+    - marginal_from_ds: [!dag_prev ]
+      kwargs: {x: x, y: loss, along_dim: [batch]}
+      file_cache:
+        read: True
+        write: True
+      tag: marginal
+    - mean: [!dag_prev ]
+      kwargs: {x: x, y: y, along_dim: [bin_idx]}
+    - getitem: [!dag_prev , 'mean']
+      tag: mean
+    - std: [!dag_tag marginal]
+      kwargs: {x: x, y: y, along_dim: [bin_idx]}
+    - getitem: [ !dag_prev , 'std' ]
+    - mul: [!dag_prev , 0]
+      tag: std
+    - xr.Dataset:
+      - y: !dag_tag mean
+        yerr: !dag_tag std
+    - .assign_coords: [!dag_prev , {Year: !range [2012, 2022]}]
+    - .squeeze_with_drop: [!dag_prev ]
+      tag: unnormalised_data
+
+      # Normalize to mean of 2012
+    - .isel: [!dag_prev , {Year: 0}]
+    - .mean: [!dag_prev ]
+    - div: [!dag_tag unnormalised_data, !dag_prev ]
+      tag: data
+
+  x: Year
+  y: y
+  yerr: yerr
+  hue: j
+  helpers:
+    set_labels:
+      x: ''
+      y: ''
+    set_legend:
+      title: ''
+      ncol: 2
+#      bbox_to_anchor: [0.5, 1.2]
+      loc: upper left
+      handlelength: 0.75
+      labelspacing: 0.3
+      columnspacing: 0.8
+    set_limits:
+      x: [2012, ~]
+  style:
+    figure.figsize: [!dag_result half_width, !dag_result fifth_width]
+
+# Import cost to the UK
+cost_UK:
+  based_on: cost_Mexico
+  select_and_combine:
+    fields:
+      prediction:
+        transform:
+          - .sel_with_drop: [ !dag_prev , {j: 'UK' , i: [Mexico, Chile, Peru, South Africa, Netherlands, Spain]} ]
+  hue: i
+  helpers:
+    set_legend:
+      title: ''
+      ncol: 2
+      loc: center right
+
+# Pie chart of trade indices for Mexico
+pie_chart_Mexico:
+  based_on:
+    - .creator.multiverse
+    - .plot.facet_grid
+  kind: pie
+  select_and_combine:
+    fields:
+      # Mask values that are non-existent or zero in the original data
+      T_mask:
+        path: T
+        transform:
+          - .sel_with_drop: [ !dag_prev , { i: 'Mexico' } ]
+          - create_mask: [!dag_prev , '>', 0]
+      T_true:
+        path: T
+        transform:
+          - .sel_with_drop: [ !dag_prev , { i: 'Mexico' } ]
+      T:
+        path: predicted_T
+        transform:
+          - .sel_with_drop: [ !dag_prev , { i: 'Mexico' } ]
+      C:
+        path: predicted_C
+        transform:
+          - .sel_with_drop: [ !dag_prev , { i: 'Mexico' } ]
+      loss:
+        path: loss
+        transform:
+          - .sel_with_drop: [!dag_prev , {kind: T}]
+    subspace:
+      Year: 9
+  transform:
+
+    # Flatten the probabilities
+    - flatten_dims: [!dag_tag loss ]
+      kwargs:
+        dims: { batch: [ seed, epoch, Year ] }
+    - divide_by_median: [!dag_prev , "batch" ]
+    - neg_exp: [!dag_prev ]
+      tag: probability
+
+    # Get the mean cost
+    - .where: [!dag_tag C, !dag_tag T_mask]
+      kwargs: {drop: True}
+    - flatten_dims: [!dag_prev ]
+      kwargs:
+        dims: { batch: [ seed, epoch, Year ] }
+    - broadcast: [!dag_prev , !dag_tag probability ]
+    - marginal_from_ds: [!dag_prev ]
+      kwargs: {x: x, y: loss, along_dim: [batch]}
+    - mean: [!dag_prev ]
+      kwargs: {x: x, y: y, along_dim: [bin_idx]}
+    - getitem: [!dag_prev , 'mean']
+
+    # Normalise to the mean cost
+    - .mean: [!dag_prev ]
+    - div: [!dag_node -2, !dag_prev ]
+      tag: mean_C
+
+    # Get the mean transport flow from the prediction
+#    - .where: [!dag_tag T, !dag_tag T_mask]
+#      kwargs: {drop: True}
+#    - flatten_dims: [!dag_prev ]
+#      kwargs:
+#        dims: { batch: [ seed, epoch, Year ] }
+#    - broadcast: [!dag_prev , !dag_tag probability ]
+#    - marginal_from_ds: [!dag_prev ]
+#      kwargs: {x: x, y: loss, along_dim: [batch]}
+#    - mean: [!dag_prev ]
+#      kwargs: {x: x, y: y, along_dim: [bin_idx]}
+#    - getitem: [!dag_prev , 'mean']
+#      tag: mean_T
+
+    # Get the true transport flow
+    - .isel_with_drop: [!dag_tag T_true, {seed: 0, Year: 0}]
+    - create_mask: [!dag_prev , '>', 0]
+    - .where: [!dag_node -2 , !dag_prev , 0]
+      kwargs: {drop: True}
+      tag: mean_T
+
+      # Take the logarithm
+    - mul: [ !dag_tag mean_C , 10]
+    - log: [!dag_prev ]
+      tag: log_mean_C
+
+    # Combine into a dataset
+    - xr.Dataset:
+        - C: !dag_tag mean_C
+          T: !dag_tag mean_T
+          log_C: !dag_tag log_mean_C
+
+    # Sort by cost
+    - .sortby: [!dag_prev , 'C']
+      tag: data
+
+  x: T
+  y: log_C
+  hue: C
+  title: 'Mexico'
+  outer_padding: 1.1
+  start_angle: 50
+  end_angle: 410
+  norm: LogNorm
+  cmap:
+    from_values:
+      0: !dag_result c_yellow
+      1: !dag_result c_darkblue
+    continuous: true
+  style:
+    figure.figsize: [30, 30]
+    figure.facecolor: 'white' #"#F8F1F1"
+    axes.titlesize: 65
+    font.size: 55
+
+# Pie chart of trade indices for UK
+pie_chart_UK:
+  based_on: pie_chart_Mexico
+  select_and_combine:
+    fields:
+      # Mask values that are non-existent or zero in the original data
+      T_mask:
+        path: T
+        transform:
+          - .sel_with_drop: [ !dag_prev , { j: 'UK' } ]
+          - create_mask: [!dag_prev , '>', 0]
+      T_true:
+        path: T
+        transform:
+          - .sel_with_drop: [ !dag_prev , { j: 'UK' } ]
+      T:
+        path: predicted_T
+        transform:
+          - .sel_with_drop: [ !dag_prev , { j: 'UK' } ]
+      C:
+        path: predicted_C
+        transform:
+          - .sel_with_drop: [ !dag_prev , { j: 'UK' } ]
+  title: 'UK'
+  start_angle: 110
+  end_angle: 470
+
+# Compare the average retail price increase
+UK_retail_price:
+  based_on:
+    - .creator.multiverse
+    - .plot.facet_grid.line
+  select_and_combine:
+    fields:
+      # Mask values that are non-existent or zero in the original data
+      T:
+        path: T
+        transform:
+          - .sel_with_drop: [ !dag_prev , { j: 'UK' } ]
+      C:
+        path: predicted_C
+        transform:
+          - .sel_with_drop: [ !dag_prev , { j: 'UK' } ]
+      loss:
+        path: loss
+        transform:
+          - .sel_with_drop: [!dag_prev , {kind: T}]
+  transform:
+
+    # Flatten the probabilities
+    - flatten_dims: [!dag_tag loss ]
+      kwargs:
+        dims: { batch: [ seed, epoch] }
+    - divide_by_median: [!dag_prev , "batch" ]
+    - neg_exp: [!dag_prev ]
+      tag: probability
+
+    # Get the mean cost
+    - flatten_dims: [!dag_tag C ]
+      kwargs:
+        dims: { batch: [ seed, epoch ] }
+    - broadcast: [!dag_prev , !dag_tag probability ]
+      file_cache:
+        read: True
+        write: True
+      tag: C_broadcast
+    - marginal_from_ds: [!dag_tag C_broadcast ]
+      kwargs: {x: x, y: loss, along_dim: [batch]}
+      file_cache:
+        read: True
+        write: True
+      tag: C_marginals
+
+    - mean: [!dag_tag C_marginals ]
+      kwargs: {x: x, y: y, along_dim: [bin_idx]}
+    - getitem: [!dag_prev , 'mean']
+      tag: C_mean
+
+     # Multiply with the true transport flow
+    - .isel_with_drop: [!dag_tag T, {seed: 0}]
+    - create_mask: [!dag_prev , '>', 0]
+    - .where: [!dag_node -2, !dag_prev , 0]
+      tag: T_masked
+    - .sum: [!dag_prev , 'i']
+    - mul: [!dag_tag C_mean, !dag_tag T_masked ]
+    - .sum: [!dag_prev , 'i']
+    - div: [!dag_prev , !dag_node -3]
+    - .assign_coords: [!dag_prev , {Year: !range [2012, 2022]}]
+      tag: pred_RPI
+
+    - import_and_call: [ pandas, read_csv, 'data/IOT/ONS_RPI/Avocados_Pears_Feb_24.csv' ]
+      kwargs: {index_col: 0}
+    - .to_xarray: [!dag_prev ]
+    - .to_array: [!dag_prev ]
+    - .sel: [!dag_prev , {Year: !range [2012, 2022]}]
+      tag: ONS_RPI
+
+    - concat_along: [[!dag_tag ONS_RPI, !dag_tag pred_RPI], 'type', ['Avg. RPI', 'Prediction']]
+    - .isel: [!dag_prev , {Year: 0}]
+    - div: [!dag_node -2, !dag_prev ]
+      tag: data
+  x: Year
+  hue: type
+  style:
+    figure.figsize: [!dag_result half_width, !dag_result quarter_width]
+  helpers:
+    set_title:
+      title: ''
+    set_legend:
+      title: ''
+
+# Compare the import and export discrepancies between the data and the prediction
+Mexico_export_discrepancy:
+  based_on:
+    - .creator.multiverse
+    - .plot.facet_grid.bar
+  select_and_combine:
+    fields:
+      # Mask values that are non-existent or zero in the original data
+      T_mask:
+        path: T
+        transform:
+          - .sel_with_drop: [ !dag_prev , { i: 'Mexico' } ]
+          - create_mask: [!dag_prev , '>', 0]
+      T_true:
+        path: T
+        transform:
+          - .sel_with_drop: [ !dag_prev , { i: 'Mexico' } ]
+      T:
+        path: predicted_T
+        transform:
+          - .sel_with_drop: [ !dag_prev , { i: 'Mexico' } ]
+      loss:
+        path: loss
+        transform:
+          - .sel_with_drop: [!dag_prev , {kind: T}]
+    subspace:
+      Year: 9
+  transform:
+
+    # Flatten the probabilities
+    - flatten_dims: [!dag_tag loss ]
+      kwargs:
+        dims: { batch: [ seed, epoch, Year ] }
+    - divide_by_median: [!dag_prev , "batch" ]
+    - neg_exp: [!dag_prev ]
+      tag: probability
+
+    # Get the mean transport flow from the prediction
+    - .where: [!dag_tag T, !dag_tag T_mask]
+      kwargs: {drop: True}
+    - flatten_dims: [!dag_prev ]
+      kwargs:
+        dims: { batch: [ seed, epoch, Year ] }
+    - broadcast: [!dag_prev , !dag_tag probability ]
+    - marginal_from_ds: [!dag_prev ]
+      kwargs: {x: x, y: loss, along_dim: [batch]}
+    - mode: [!dag_prev ]
+      kwargs: {x: x, y: y, along_dim: [bin_idx]}
+    - getitem: [!dag_prev , 'mode_x']
+      tag: mean_T
+
+    # Get the true transport flow
+    - .isel_with_drop: [!dag_tag T_true, {seed: 0, Year: 0}]
+    - create_mask: [!dag_prev , '>', 0]
+    - .where: [!dag_node -2 , !dag_prev ]
+      kwargs: {drop: True}
+      tag: true_T
+
+    - sub: [!dag_tag mean_T, !dag_tag true_T]
+    - np.abs: [!dag_prev ]
+    - div: [!dag_prev , !dag_tag true_T]
+    - xr.Dataset:
+        - T: !dag_tag true_T
+          diff: !dag_prev
+    - .sortby: [!dag_prev , 'T']
+      file_cache:
+        read: True
+        write: True
+      tag: data
+    - .coords: [!dag_prev , 'j']
+    - .data: [!dag_prev ]
+    - list: [!dag_prev ]
+      tag: coords
+
+  x: j
+  y: diff
+  hue: diff
+  norm: LogNorm
+  cmap:
+    from_values:
+      0: !dag_result c_lightgreen
+      0.4: !dag_result c_darkblue
+      1: !dag_result c_red
+    continuous: true
+  helpers:
+    set_scales:
+      y: symlog
+    set_ticks:
+      x:
+        major:
+          locs: !dag_result coords
+          labels: !dag_result coords
+          ha: center
+          rotation: 90
+
+# Compare the import and export discrepancies between the data and the prediction
+discrepancies_Mex:
+  based_on:
+    - .creator.multiverse
+    - .plot.multiplot
+  select_and_combine:
+    fields:
+      T_true:
+        path: T
+        transform:
+          - .sel_with_drop: [ !dag_prev , { i: 'Mexico' } ]
+      T:
+        path: predicted_T
+        transform:
+          - .sel_with_drop: [ !dag_prev , { i: 'Mexico' } ]
+      loss:
+        path: loss
+        transform:
+          - .sel_with_drop: [!dag_prev , {kind: T}]
+
+  transform:
+
+    # Flatten the probabilities
+    - flatten_dims: [!dag_tag loss ]
+      kwargs:
+        dims: { batch: [ seed, epoch ] }
+    - divide_by_median: [!dag_prev , "batch" ]
+    - neg_exp: [!dag_prev ]
+      tag: probability
+
+    # Get the mean transport flow from the prediction
+    - flatten_dims: [!dag_tag T ]
+      kwargs:
+        dims: { batch: [ seed, epoch ] }
+    - broadcast: [!dag_prev , !dag_tag probability ]
+    - marginal_from_ds: [!dag_prev ]
+      kwargs: {x: x, y: loss, along_dim: [batch]}
+    - mode: [!dag_prev ]
+      kwargs: {x: x, y: y, along_dim: [bin_idx]}
+    - getitem: [!dag_prev , 'mode_x']
+      file_cache:
+        read: True
+        write: True
+      tag: mean_T
+
+    # Get the true transport flow
+    - .isel_with_drop: [!dag_tag T_true, {seed: 0}]
+    - .fillna: [!dag_prev , 0]
+      file_cache:
+        read: True
+        write: True
+      tag: true_T
+    - .sum: [!dag_prev , 'j']
+    - div: [!dag_tag true_T , !dag_prev ]
+      tag: T_prop
+
+    - sub: [!dag_tag mean_T, !dag_tag true_T]
+    - np.abs: [!dag_prev ]
+    - create_mask: [!dag_tag true_T, '>', 0]
+    - .where: [!dag_tag true_T, !dag_prev , 1]
+    - div: [!dag_node -3 , !dag_prev ]
+    - xr.Dataset:
+        - T: !dag_tag true_T
+          T_pred: !dag_tag mean_T
+          T_prop: !dag_tag T_prop
+          Diff: !dag_prev
+    - .assign_coords: [!dag_prev , {Year: !range [2012, 2022]}]
+      file_cache:
+        read: True
+        write: True
+      tag: data
+
+    - getitem: [!dag_prev , 'Diff']
+      tag: diff
+    - .mean: [!dag_tag diff , 'j']
+    - .median: [!dag_tag diff, 'j']
+    - concat_along: [[!dag_prev , !dag_node -2], 'type', ['Median', 'Mean']]
+      file_cache:
+        read: True
+        write: True
+      tag: stats
+  compute_only: [data, stats]
+  to_plot:
+    - function: [xarray.plot, scatter]
+      args: [!dag_result data]
+      add_legend: False
+      x: Year
+      y: Diff
+      markersize: T_prop
+      hue: T_prop
+      s: 0.1
+      alpha: 0.8
+      lw: 0
+      cmap:
+        from_values:
+          0.0: !dag_result c_lightgreen
+          0.4: !dag_result c_darkblue
+          1: !dag_result c_red
+        continuous: true
+      cbar_kwargs:
+        label: Proportion of total (\%)
+    - function: [xarray.plot, line]
+      args: [ !dag_result stats ]
+      hue: type
+      x: Year
+  helpers:
+    set_labels:
+      x: ''
+      y: Relative error (\%)
+    set_scales:
+      y: log
+    set_legend:
+      use_legend: False
+  style:
+    figure.figsize: [!dag_result half_width, !dag_result quarter_width]
+
+discrepancies_UK:
+  based_on: discrepancies_Mex
+  select_and_combine:
+    fields:
+      T_true:
+        path: T
+        transform:
+          - .sel_with_drop: [ !dag_prev , { j: 'UK' } ]
+      T:
+        path: predicted_T
+        transform:
+          - .sel_with_drop: [ !dag_prev , { j: 'UK' } ]
+  transform:
+
+    # Flatten the probabilities
+    - flatten_dims: [!dag_tag loss ]
+      kwargs:
+        dims: { batch: [ seed, epoch ] }
+    - divide_by_median: [!dag_prev , "batch" ]
+    - neg_exp: [!dag_prev ]
+      tag: probability
+
+    # Get the mean transport flow from the prediction
+    - flatten_dims: [!dag_tag T ]
+      kwargs:
+        dims: { batch: [ seed, epoch ] }
+    - broadcast: [!dag_prev , !dag_tag probability ]
+    - marginal_from_ds: [!dag_prev ]
+      kwargs: {x: x, y: loss, along_dim: [batch]}
+    - mode: [!dag_prev ]
+      kwargs: {x: x, y: y, along_dim: [bin_idx]}
+    - getitem: [!dag_prev , 'mode_x']
+      file_cache:
+        read: True
+        write: True
+      tag: mean_T
+
+    # Get the true transport flow
+    - .isel_with_drop: [!dag_tag T_true, {seed: 0}]
+    - .fillna: [!dag_prev , 0]
+      file_cache:
+        read: True
+        write: True
+      tag: true_T
+    - .sum: [!dag_prev , 'i']
+    - div: [!dag_tag true_T , !dag_prev ]
+      tag: T_prop
+
+
+    - sub: [!dag_tag mean_T, !dag_tag true_T]
+    - np.abs: [!dag_prev ]
+    - create_mask: [!dag_tag true_T, '>', 0]
+    - .where: [!dag_tag true_T, !dag_prev , 1]
+    - div: [!dag_node -3 , !dag_prev ]
+    - xr.Dataset:
+        - T: !dag_tag true_T
+          T_pred: !dag_tag mean_T
+          T_prop: !dag_tag T_prop
+          Diff: !dag_prev
+    - .assign_coords: [!dag_prev , {Year: !range [2012, 2022]}]
+      tag: data
+
+    - getitem: [!dag_prev , 'Diff']
+      tag: diff
+    - .mean: [!dag_tag diff , 'i']
+    - .median: [!dag_tag diff, 'i']
+    - concat_along: [[!dag_prev , !dag_node -2], 'type', ['Median', 'Mean']]
+      tag: stats
+  helpers:
+    set_legend:
+      use_legend: True
+      title: ''
+      ncol: 2

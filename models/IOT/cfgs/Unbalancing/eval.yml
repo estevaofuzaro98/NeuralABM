@@ -1,0 +1,190 @@
+# Plot the different kinds of loss
+loss:
+  based_on:
+    - .creator.multiverse
+    - .plot.facet_grid.errorbands
+  select_and_combine:
+    fields:
+      loss: loss
+  transform:
+    - .assign_coords: [!dag_tag loss , {sigma: [5, 15, 30]}]
+    - .rename: [!dag_prev , {sigma: $\sigma$}]
+    - .mean: [!dag_prev , 'seed']
+    - .std: [!dag_node -2, 'seed']
+    - xr.Dataset:
+      - y: !dag_node -2
+        yerr: !dag_prev
+      tag: data
+  x: epoch
+  y: y
+  yerr: yerr
+  hue: kind
+  col: $\sigma$
+  helpers:
+    set_scales:
+      y: log
+
+# Plot the marginals
+marginals:
+  based_on:
+    - .creator.multiverse
+    - .plot.facet_grid.density
+  select_and_combine:
+    fields:
+      mu:
+        path: predicted_mu
+        transform: [.data]
+      nu:
+        path: predicted_nu
+        transform: [.data]
+      true_mu:
+        path: mu
+        transform: [.data]
+      true_nu:
+        path: nu
+        transform: [.data]
+      loss:
+        path: loss
+  transform:
+
+    # Marginal in mu
+    - .isel_with_drop: [!dag_tag true_mu, {seed: 0}]
+      tag: true_mu_flattened
+    - .sel: [!dag_tag loss, {kind: mu}]
+    - flatten_dims: [!dag_prev ]
+      kwargs:
+        dims: { batch: [ seed, epoch ] }
+    - divide_by_median: [!dag_prev , "batch" ]
+    - neg_exp: [!dag_prev ]
+      tag: prob_mu
+    - flatten_dims: [!dag_tag mu]
+      kwargs:
+        dims: { batch: [ seed, epoch]}
+    - marginal_distribution: [!dag_prev , !dag_tag prob_mu , !dag_tag true_mu_flattened ]
+      kwargs:
+        bin_coord: i
+        exclude_dim: [sigma]
+      tag: data_mu
+
+    - .isel_with_drop: [!dag_tag true_nu, {seed: 0}]
+      tag: true_nu_flattened
+    - .sel: [!dag_tag loss, {kind: nu}]
+    - flatten_dims: [!dag_prev ]
+      kwargs:
+        dims: { batch: [ seed, epoch ] }
+    - divide_by_median: [!dag_prev , "batch" ]
+    - neg_exp: [!dag_prev ]
+      tag: prob_nu
+    - flatten_dims: [!dag_tag nu]
+      kwargs:
+        dims: { batch: [ seed, epoch]}
+    - marginal_distribution: [!dag_prev , !dag_tag prob_nu , !dag_tag true_nu_flattened ]
+      kwargs:
+        bin_coord: i
+        exclude_dim: [sigma]
+      tag: data_nu
+
+    - concat_along: [[!dag_tag data_mu, !dag_tag data_nu ], 'marginal', ['$\boldsymbol{\mu}$', '$\boldsymbol{\nu}$']]
+    - .fillna: [!dag_prev , 0]
+    - .assign_coords: [!dag_prev , {sigma: [1, 15, 50]}]
+    - .rename: [!dag_prev , {sigma: $\sigma$}]
+      tag: data
+  x: i
+  y: y
+  yerr: yerr
+  hue: type
+  col: $\sigma$
+  row: marginal
+  sharex: True
+  sharey: False
+  linestyle: [solid, dotted]
+  smooth_kwargs:
+    enabled: True
+    smoothing: 1.0
+  figsize: [ !dag_result full_width, !dag_result third_width ]
+  add_legend: False
+  helpers:
+    setup_figure:
+      ncols: 3
+      nrows: 2
+    set_labels:
+      x: ''
+      y: ''
+    set_tick_locators:
+      x:
+        major:
+          name: MaxNLocator
+          integer: True
+    axis_specific:
+      0:
+        axis: [0, 0]
+        set_legend:
+          custom_labels: [Prediction, True marginal]
+          handlelength: 1.5
+      1:
+        axis: [ 1, 0 ]
+
+# Densities on four randomly chosen cost matrix edges
+cost_edges:
+  based_on:
+    - .creator.multiverse
+    - .plot.facet_grid.density
+  select_and_combine:
+    fields:
+      C:
+        path: predicted_C
+        transform: [.data]
+      loss:
+        path: loss
+        transform:
+#          - .sum: [!dag_prev , 'kind']
+          - .sel_with_drop: [!dag_prev , {kind: T}]
+  transform:
+    - sel_random_matrix_entries: [!dag_tag C, 4]
+      kwargs:
+        drop: True
+    - flatten_dims: [!dag_prev ]
+      kwargs:
+        dims: {batch: ['seed', 'epoch']}
+      tag: edges
+    - flatten_dims: [!dag_tag loss ]
+      kwargs:
+        dims: { batch: [ seed, epoch ] }
+    - divide_by_median: [!dag_prev , "batch" ]
+    - neg_exp: [!dag_prev ]
+      tag: prob
+    - broadcast: [!dag_tag edges, !dag_tag prob ]
+    - .assign_coords: [!dag_prev , {sigma: [1, 15, 50]}]
+    - marginal_from_ds: [!dag_prev ]
+      kwargs:
+        x: x
+        y: loss
+        along_dim: batch
+    - .rename: [!dag_prev , {sigma: $\sigma$}]
+      tag: data
+  x: x
+  y: y
+  col: idx
+  hue: $\sigma$
+  sharey: False
+  sharex: False
+  add_legend: False
+  smooth_kwargs:
+    enabled: True
+    smoothing: 2.0
+  figsize: [!dag_result full_width, !dag_result quarter_width]
+  helpers:
+#    set_limits:
+#      x: [~, 0.2]
+    set_title:
+      title: ''
+    set_labels:
+      x: ''
+      y: ''
+    axis_specific:
+      0:
+        axis: [0, 0]
+        set_legend:
+          use_legend: True
+          custom_labels: [$\sigma =1$, '15', '50']
+          handlelength: 1

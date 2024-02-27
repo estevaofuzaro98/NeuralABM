@@ -86,10 +86,11 @@ if __name__ == "__main__":
 
     # Neural network for the marginals matrix
     netM = base.NeuralNet(
-        input_size=M * N,
-        output_size=M * N,
+        input_size=M + N,
+        output_size=M + N,
         **model_cfg["NeuralNetM"],
     ).to(device)
+    log.info(f"   Initialised neural networks with output dimensions: {netC.output_dim} (C) and {netM.output_dim} (M)")
 
     # Initialise the model
     model = IOT.NN(
