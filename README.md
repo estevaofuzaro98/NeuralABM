@@ -137,14 +137,15 @@ This will pull all the datasets.
 
 ### Installation on Windows
 
-On Windows systems, you must use the Windows development branches of utopya and dantro. Be aware that development on these
-is ongoing; if you run into any problems, please file an issue. After completing the steps above, install the 
-packages by running the following two commands:
+On Windows systems, you must use the Windows development branch of utopya; after completing the steps above, run:
 
 ```commandline
-pip install git+https://gitlab.com/utopia-project/utopya@support-windows-platform
-pip install git+https://gitlab.com/utopia-project/dantro@support_windows_platform
+pip uninstall utopya
+pip install git+https://gitlab.com/utopia-project/utopya@89-allow-exec-prefix
 ```
+
+Be aware that development on the utopya Windows dev branch is ongoing; if you run into any problems, please file an [issue](https://gitlab.com/utopia-project/utopya/-/issues/new). 
+
 Lastly, you must change the default encoding to utf-8 on Windows; in the Control Panel, navigate to the 
 Regional Settings, go to the 'Administrative' tab, click 'Change system locale' under 'Language for non-Unicode programs',
 and check the 'Beta: Use Unicode UTF-8 for worldwide language support option'. See [here](https://stackoverflow.com/questions/57131654/using-utf-8-encoding-chcp-65001-in-command-prompt-windows-powershell-window/57134096#57134096)
