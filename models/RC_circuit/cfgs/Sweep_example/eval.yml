@@ -90,3 +90,40 @@ marginals_all:
   col: parameter
   sharex: False
   sharey: False
+
+# Plot the joint
+joint:
+  based_on:
+    - .creator.multiverse
+    - .plot.facet_grid.pcolormesh
+  select_and_combine:
+    fields:
+      parameters: parameters
+      probabilities:
+        path: loss
+        transform: [neg_exp]
+  transform:
+    # Flatten the prob and parameter samples into a single dimension
+    - flatten_dims: [!dag_tag probabilities ]
+      kwargs:
+        dims: {sample: [batch, seed]}
+      tag: prob
+    - flatten_dims: [!dag_tag parameters ]
+      kwargs:
+        dims: {sample: [batch, seed]}
+      tag: params
+
+    # Compute the joint
+    - joint_2D_ds: [!dag_tag params, !dag_tag prob]
+      kwargs:
+        x: R
+        y: C
+      tag: data
+  x: R
+  y: C
+  cmap:
+    <<: *cmap
+  cbar_kwargs:
+    label: ~
+  style:
+    figure.figsize: [!dag_result half_width, !dag_result half_width]
