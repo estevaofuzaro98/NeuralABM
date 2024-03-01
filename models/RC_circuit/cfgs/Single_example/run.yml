@@ -1,0 +1,18 @@
+paths:
+  model_note: Single_example
+parameter_space:
+  num_epochs: 500
+
+  RC_circuit:
+    Data:
+#      load_from_dir: data/RC_circuit/Example_data/data.h5
+      synthetic_data:
+
+        # Length of time series
+        num_steps: 100
+
+        # True values for R and C
+        R: 1.2
+        C: 2.4
+    Training:
+      batch_size: 5

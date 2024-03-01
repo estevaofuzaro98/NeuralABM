@@ -1,0 +1,17 @@
+perform_sweep: True
+paths:
+  model_note: Sweep_example
+parameter_space:
+
+  # Number of different runs
+  seed: !sweep
+    default: 0
+    range: [30]
+
+  num_epochs: 1000
+
+  RC_circuit:
+    Data:
+      load_from_dir: data/RC_circuit/Example_data/data.h5
+    Training:
+      batch_size: 50

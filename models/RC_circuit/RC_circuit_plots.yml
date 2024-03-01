@@ -1,0 +1,55 @@
+# ======================================================================================================================
+#  ╔═╗╦  ╔═╗╔╦╗╔═╗
+#  ╠═╝║  ║ ║ ║ ╚═╗
+#  ╩  ╩═╝╚═╝ ╩ ╚═╝
+# ======================================================================================================================
+# Plot the evolution of the training loss
+loss:
+  based_on: loss
+  style:
+    figure.figsize: [ !dag_result full_width, !dag_result third_width ]
+
+# Plot the training data:
+training_data:
+  based_on:
+    - .creator.universe
+    - .plot.facet_grid.line
+  select:
+    data: RC_data
+  col: kind
+  col_wrap: 2
+  sharey: False
+
+# Plot the evolution of the parameters
+predictions:
+  based_on: predictions_uni
+
+# Plot the marginals on all the parameters
+marginals:
+  based_on:
+    - .creator.universe
+    - .plot.facet_grid.density
+  select:
+    parameters:
+      path: parameters
+      transform: [.data]
+    probabilities:
+      path: loss
+      transform: [neg_exp]
+  transform:
+    - broadcast: [!dag_tag parameters, !dag_tag probabilities]
+    - marginal_from_ds: [!dag_prev ]
+      kwargs:
+        x: x
+        y: loss
+        statistic: mean
+        exclude_dim: [parameter]
+      tag: data
+  x: x
+  y: y
+  sharex: False
+  sharey: False
+  col: parameter
+  smooth_kwargs:
+    enabled: True
+    smoothing: 2

@@ -1,0 +1,92 @@
+# Loss for each run
+loss:
+  based_on: loss_mv
+  hue: seed
+  alpha: 0.2
+  helpers:
+    set_legend:
+      use_legend: False
+
+# Plot the predictions over time, colour-coded by loss
+predictions:
+  based_on:
+    - .creator.multiverse
+    - .plot.facet_grid.scatter
+  select_and_combine:
+    fields:
+      parameters:
+        path: parameters
+        transform: [.data]
+      loss:
+        path: loss
+        transform: [.data]
+  transform:
+    - broadcast: [!dag_tag parameters, !dag_tag loss]
+      kwargs:
+        exclude_dim: [seed]
+    - flatten_dims: [!dag_prev ]
+      kwargs:
+        dims: {batch: [batch, seed]}
+      tag: data
+  x: batch
+  y: x
+  hue: loss
+  col: parameter
+  s: 2
+  sharey: False # Seems to have no effect?
+  sharex: False
+  helpers:
+    set_limits:
+      x: [min, max]
+      y: [0, max] # Why is this necessary?
+  add_legend: False
+  norm:
+    name: LogNorm
+  vmax: 100
+  cmap: &cmap
+    continuous: true
+    from_values:
+      0: !dag_result c_darkblue
+      1: !dag_result c_yellow
+
+# Plot the marginals together
+marginals_all:
+  based_on:
+    - .creator.multiverse
+    - .plot.facet_grid.density
+  select_and_combine:
+    fields:
+      parameters: parameters
+      loss: loss
+
+  transform:
+    # Divide the loss by the median to prevent numerical underflow
+    - .median: [!dag_tag loss, 'batch']
+    - div: [!dag_tag loss, !dag_prev ]
+    - neg_exp: [!dag_prev ]
+      tag: probabilities
+
+    # Flatten the prob and parameter samples into a single dimension
+    - flatten_dims: [!dag_tag probabilities ]
+      kwargs:
+        dims: {sample: [batch, seed]}
+      tag: prob
+    - flatten_dims: [!dag_tag parameters ]
+      kwargs:
+        dims: {sample: [batch, seed]}
+      tag: params
+    - broadcast: [!dag_tag params, !dag_tag prob]
+
+    # Get the marginals along the parameters
+    - marginal_from_ds: [!dag_prev ]
+      kwargs:
+        x: x
+        y: loss
+        exclude_dim: [parameter]
+      tag: data
+  c: !dag_result c_darkblue
+  x: x
+  y: y
+  col: parameter
+  sharex: False
+  sharey: False
