@@ -33,6 +33,7 @@ class IOT_NN:
             training_data: dict,
             epsilon: float,
             loss_function: dict,
+            to_learn: list,
             device: str,
             **__,
     ):
@@ -72,6 +73,7 @@ class IOT_NN:
         # Get the training data
         self.mu, self.nu = training_data["mu"], training_data["nu"]
         self.T = training_data["T"]
+        self.C = training_data.get("C", None)
 
         # Masks for the transport plan and marginals
         self.T_mask = self.T >= 0
@@ -87,6 +89,9 @@ class IOT_NN:
         self.current_marginals: torch.Tensor = torch.zeros(self.M + self.N)
         self.current_C: torch.Tensor = torch.zeros(self.M, self.N)
         self.current_T: torch.Tensor = torch.zeros(self.M, self.N)
+
+        # Parameters to learn:
+        self.to_learn = to_learn
 
         # Epochs processed
         self._time = 0
@@ -193,20 +198,26 @@ class IOT_NN:
         """
 
         # Get a sample for the cost matrix
-        C_pred = torch.reshape(
-            self.neural_netC(
-                torch.rand(self.neural_netC.input_dim, requires_grad=True)
-            ),
-            (self.M, self.N),
-        )
+        if "C" in self.to_learn:
+            C_pred = torch.reshape(
+                self.neural_netC(
+                    torch.rand(self.neural_netC.input_dim, requires_grad=True)
+                ),
+                (self.M, self.N),
+            )
+        else:
+            C_pred = self.C
 
         # Get a sample for the marginals
-        marginals = self.neural_netM(
-            torch.rand(self.neural_netM.input_dim, requires_grad=True)
-        )
-        mu_pred, nu_pred = torch.reshape(marginals[0: self.M], (-1, 1)), torch.reshape(
-            marginals[self.M: self.M + self.N], (1, -1)
-        )
+        if "marginals" in self.to_learn:
+            marginals = self.neural_netM(
+                torch.rand(self.neural_netM.input_dim, requires_grad=True)
+            )
+            mu_pred, nu_pred = torch.reshape(marginals[0: self.M], (-1, 1)), torch.reshape(
+                marginals[self.M: self.M + self.N], (1, -1)
+            )
+        else:
+            mu_pred, nu_pred = self.mu, self.nu
 
         # Get the marginals from the predicted cost matrix
         m, n = base.Sinkhorn(
@@ -220,30 +231,35 @@ class IOT_NN:
         _, _, T_pred = base.marginals_and_transport_plan(m, n, C_pred, epsilon=self.epsilon)
 
         # Train the cost NN to match both the observed transport plan and marginals
-        lossC = (
-                self.loss_function(T_pred[self.T_mask], self.T[self.T_mask]) /self.T.nansum()
-                + self.loss_function(T_pred.sum(dim=1, keepdim=True)[self.mu_mask], self.mu[self.mu_mask]) /(self.N*self.mu.nansum())
-                + self.loss_function(T_pred.sum(dim=0, keepdim=True)[self.nu_mask], self.nu[self.nu_mask]) /(self.M*self.nu.nansum())
-                + self.loss_function(torch.abs(C_pred).sum(dim=1, keepdim=False), torch.ones(self.M)) /self.T.nansum()
-        )
+        if "C" in self.to_learn:
+            lossC = (
+                    self.loss_function(T_pred[self.T_mask], self.T[self.T_mask]) /self.T.nansum()
+                    + self.loss_function(T_pred.sum(dim=1, keepdim=True)[self.mu_mask], self.mu[self.mu_mask]) /(self.N*self.mu.nansum())
+                    + self.loss_function(T_pred.sum(dim=0, keepdim=True)[self.nu_mask], self.nu[self.nu_mask]) /(self.M*self.nu.nansum())
+                    + self.loss_function(torch.abs(C_pred).sum(dim=1, keepdim=False), torch.ones(self.M)) / self.T.nansum()
 
-        lossC.backward()
-        self.neural_netC.optimizer.step()
-        self.neural_netC.optimizer.zero_grad()
+                    # Want entries on the NAN values to be as small as possible
+                    + torch.sum(torch.abs(T_pred[~self.T_mask]))
+            )
+
+            lossC.backward()
+            self.neural_netC.optimizer.step()
+            self.neural_netC.optimizer.zero_grad()
 
         # Train the marginal NN to match the observed marginals and the marginals from the
         # predicted cost matrix
-        lossM = (
-                self.loss_function(mu_pred[self.mu_mask], self.mu[self.mu_mask])
-                + self.loss_function(nu_pred[self.nu_mask], self.nu[self.nu_mask])
-                + self.loss_function(mu_pred[self.mu_mask], torch.nansum(self.T, dim=1, keepdim=True)[self.mu_mask])
-                + self.loss_function(nu_pred[self.nu_mask], torch.nansum(self.T, dim=0, keepdim=True)[self.nu_mask])
-        )
+        if "marginals" in self.to_learn:
+            lossM = (
+                    self.loss_function(mu_pred[self.mu_mask], self.mu[self.mu_mask])
+                    + self.loss_function(nu_pred[self.nu_mask], self.nu[self.nu_mask])
+                    + self.loss_function(mu_pred[self.mu_mask], torch.nansum(self.T, dim=1, keepdim=True)[self.mu_mask])
+                    + self.loss_function(nu_pred[self.nu_mask], torch.nansum(self.T, dim=0, keepdim=True)[self.nu_mask])
+            )
 
-        lossM.backward()
+            lossM.backward()
 
-        self.neural_netM.optimizer.step()
-        self.neural_netM.optimizer.zero_grad()
+            self.neural_netM.optimizer.step()
+            self.neural_netM.optimizer.zero_grad()
 
         # Write the data
         self.current_loss = torch.tensor(
@@ -278,9 +294,7 @@ class IOT_NN:
             self._dset_mu.resize(self._dset_mu.shape[0] + 1, axis=0)
             self._dset_mu[-1, :] = self.current_marginals[0: self.M]
             self._dset_nu.resize(self._dset_nu.shape[0] + 1, axis=0)
-            self._dset_nu[-1, :] = self.current_marginals[
-                                   self.M: self.M + self.N
-                                   ]
+            self._dset_nu[-1, :] = self.current_marginals[self.M: self.M + self.N]
 
             # Write the cost matrix
             self._dset_C.resize(self._dset_C.shape[0] + 1, axis=0)

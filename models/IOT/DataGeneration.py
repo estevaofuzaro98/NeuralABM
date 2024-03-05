@@ -16,7 +16,7 @@ log = logging.getLogger(__name__)
 
 
 def generate_synthetic_data(
-    cfg: dict = None, *, epsilon: float, **__
+        cfg: dict = None, *, epsilon: float, **__
 ) -> dict:
     """
     Generates a synthetic cost matrix, transport map, and marginals. The marginals can be unbalanced by adding a
@@ -43,7 +43,7 @@ def generate_synthetic_data(
     elif nw_structure['distribution'].lower() == "l2_distance":
         iota = 1e-2
         C = torch.tensor(
-            [[iota + np.abs(i - j)**2 for j in range(N)] for i in range(M)],
+            [[iota + np.abs(i - j) ** 2 for j in range(N)] for i in range(M)],
             dtype=torch.float,
         )
     else:
@@ -55,8 +55,8 @@ def generate_synthetic_data(
         C /= C.sum(dim=1, keepdim=True)
 
     # Get random Lagrange multipliers
-    d1 = torch.diag(base.random_tensor(cfg["mu"], size=(M, )))
-    d2 = torch.diag(base.random_tensor(cfg["nu"], size=(N, )))
+    d1 = torch.diag(base.random_tensor(cfg["mu"], size=(M,)))
+    d2 = torch.diag(base.random_tensor(cfg["nu"], size=(N,)))
 
     # Generate the transport plan
     T = torch.matmul(torch.matmul(d1, torch.exp(-C / epsilon)), d2)
@@ -108,7 +108,6 @@ def get_data(*, data_cfg: dict, h5group: h5.Group, **kwargs) -> dict:
                 log.debug("No cost matrix found in dataset.")
 
             T = sf * torch.from_numpy(np.array(f["IOT"][T_key])).float()
-
             data = dict(C=C, T=T, mu=mu, nu=nu) if C is not None else dict(T=T, mu=mu, nu=nu)
             if time_isel is not None:
                 data = dict((k, v[time_isel]) for k, v in data.items())
@@ -180,9 +179,9 @@ def get_data(*, data_cfg: dict, h5group: h5.Group, **kwargs) -> dict:
         dtype=float,
     )
     dset_nu.attrs["dim_names"] = ["i"]
-    dset_nu.attrs["coords_mode__i"] = data.get("coords_mode__i", "trivial")
+    dset_nu.attrs["coords_mode__i"] = data.get("coords_mode__j", "trivial")
     if data.get("coords_mode__i", "trivial") == "values":
-        dset_nu.attrs["coords__i"] = data["coords__i"]
+        dset_nu.attrs["coords__i"] = data["coords__j"]
     dset_nu[:] = data["nu"].squeeze(-2)
 
     # Return the tensors, which have shapes (M, N) (C), (M, N) (T), (M, 1) (mu), and (1, N) (nu) respectively.

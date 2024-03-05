@@ -80,3 +80,4 @@ Training:
     kwargs:
       reduction: sum
   device: cpu
+  to_learn: [C, marginals]

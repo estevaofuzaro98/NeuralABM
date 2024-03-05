@@ -30,7 +30,7 @@ def _draw_wedge(_ax, start_angle, end_angle, length, bar_length, *, color):
 
 def _add_text(_ax, x, y, country, value, angle):
     """ Adds wedge text with the correct orientation"""
-    if angle < 270:
+    if 90 <= angle % 360 < 270:
         text = "{} ({})".format(country, value)
         _ax.text(x, y, text, rotation=angle - 180, ha="right", va="center", rotation_mode="anchor")
     else:
@@ -93,19 +93,19 @@ def pie(
     add_colorbar: bool = True,
     cbar_kwargs: dict = None,
     start_angle: int = 90,
-    end_angle: int = 430,
+    end_angle: int = None,
     pad: float = 1.2,
     inner_padding_factor: float = 2.0,
     outer_padding: float = 1.3,
     **plot_kwargs
 ):
 
+    # End angle is start + 360 by default
+    if end_angle is None:
+        end_angle = start_angle + 360
+
     # Coordinate name
     coord_name = list(ds.coords.keys())[0]
-    #
-    # # Only plot n_countries, if given
-    # if n_countries is not None:
-    #     ds = ds.isel({coord_name: ds[x].argsort().data[-n_countries:]})
 
     # Inner padding of the wedges
     inner_padding = inner_padding_factor * ds[y].min().item()

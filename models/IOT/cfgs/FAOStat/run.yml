@@ -2,8 +2,8 @@ paths:
   model_note: Avocados
 perform_sweep: True
 parameter_space:
-  num_epochs: 10000
-  write_every: 15
+  num_epochs: 30000
+  write_every: 100
   write_start: 1
   seed: !sweep
     default: 0
@@ -11,10 +11,10 @@ parameter_space:
   IOT:
     Data:
       load_from_dir:
-        path: data/IOT/FAOStat/Avocados_Quantity_2012-2021.h5
-        T: T_B
-        mu: mu_A
-        nu: nu_A
+        path: /Users/thomasgaskin/Downloads/FAOSTAT_data/Avocados/Avocados_Quantity_2012-2021_pooled_0.95.h5
+        T: T_mean
+        mu: mu_mean
+        nu: nu_mean
         time_isel: !sweep
           default: 0
           range: [10]

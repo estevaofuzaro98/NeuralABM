@@ -26,90 +26,68 @@ loss:
       x: log
       y: log
 
-# Plot the marginals
-marginals:
+# Export marginal for two years
+marginals_mu:
   based_on:
     - .creator.multiverse
     - .plot.facet_grid.density
   select_and_combine:
     fields:
-      mu:
+      predicted_marginal:
         path: predicted_mu
         transform: [.data]
-      nu:
-        path: predicted_nu
-        transform: [.data]
-      true_mu:
+      true_marginal:
         path: mu
-        transform: [.data]
-      true_nu:
-        path: nu
         transform: [.data]
       loss:
         path: loss
+        transform:
+          - .sel_with_drop: [!dag_prev , {kind: mu}]
 
   transform:
 
-    # Marginal in mu
-    - .isel_with_drop: [!dag_tag true_mu, {seed: 0}]
-      tag: true_mu_flattened
-    - .sel: [!dag_tag loss, {kind: mu}]
-    - flatten_dims: [!dag_prev ]
+    # Flatten the true marginal
+    - .isel_with_drop: [!dag_tag true_marginal, {seed: 0}]
+      tag: true_marginal_flattened
+
+    # Flatten the loss
+    - flatten_dims: [!dag_tag loss ]
       kwargs:
         dims: { batch: [ seed, epoch ] }
     - divide_by_median: [!dag_prev , "batch" ]
     - neg_exp: [!dag_prev ]
-      tag: prob_mu
-    - flatten_dims: [!dag_tag mu]
+      tag: probability
+
+    - flatten_dims: [!dag_tag predicted_marginal]
       kwargs:
         dims: { batch: [ seed, epoch]}
-    - marginal_distribution: [!dag_prev , !dag_tag prob_mu , !dag_tag true_mu_flattened ]
+    - marginal_distribution: [!dag_prev , !dag_tag probability , !dag_tag true_marginal_flattened ]
       kwargs:
         bin_coord: i
         exclude_dim: [Year]
-      tag: data_mu
-
-    - .isel_with_drop: [!dag_tag true_nu, {seed: 0}]
-      tag: true_nu_flattened
-    - .sel: [!dag_tag loss, {kind: nu}]
-    - flatten_dims: [!dag_prev ]
-      kwargs:
-        dims: { batch: [ seed, epoch ] }
-    - divide_by_median: [!dag_prev , "batch" ]
-    - neg_exp: [!dag_prev ]
-      tag: prob_nu
-    - flatten_dims: [!dag_tag nu]
-      kwargs:
-        dims: { batch: [ seed, epoch]}
-    - marginal_distribution: [!dag_prev , !dag_tag prob_nu , !dag_tag true_nu_flattened ]
-      kwargs:
-        bin_coord: i
-        exclude_dim: [Year]
-      tag: data_nu
-
-    - concat_along: [[!dag_tag data_mu, !dag_tag data_nu ], 'marginal', ['$\boldsymbol{\mu}$', '$\boldsymbol{\nu}$']]
-    - .fillna: [!dag_prev , 0]
     - .assign_coords: [!dag_prev , {Year: [2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021]}]
       file_cache:
         write: True
         read: True
-      tag: marginals
-    - .sel: [!dag_tag marginals , {Year: [2020, 2021]}]
-    - .assign_coords: [!dag_prev , {i: !range [165]}]
+      tag: marginal
+    - .coords: [!dag_prev , 'i']
+    - len: [!dag_prev ]
+    - np.arange: [!dag_prev ]
+    - .assign_coords: [!dag_tag marginal , {i: !dag_prev }]
+    - .sel: [!dag_prev , {Year: [2020, 2021]}]
       tag: data
   x: i
   y: y
   yerr: yerr
   hue: type
   col: Year
-  row: marginal
   sharex: False
   sharey: True
   linestyle: [solid, dotted]
   smooth_kwargs:
     enabled: False
     smoothing: 1.0
-  figsize: [ !dag_result full_width, !dag_result half_width ]
+  figsize: [ !dag_result full_width, !dag_result quarter_width ]
   add_legend: False
   helpers:
     set_labels:
@@ -129,6 +107,19 @@ marginals:
         set_legend:
           custom_labels: [Prediction, True marginal]
           handlelength: 1.5
+
+# Import marginals
+marginals_nu:
+  based_on: marginals_mu
+  select_and_combine:
+    fields:
+      predicted_marginal:
+        path: predicted_nu
+      true_marginal:
+        path: nu
+      loss:
+        transform:
+          - .sel_with_drop: [!dag_prev , {kind: nu}]
 
 # Export costs from Mexico
 cost_Mexico:
@@ -304,7 +295,7 @@ pie_chart_Mexico:
       tag: mean_T
 
       # Take the logarithm
-    - mul: [ !dag_tag mean_C , 10]
+    - mul: [ !dag_tag mean_C , 100]
     - log: [!dag_prev ]
       tag: log_mean_C
 
@@ -368,7 +359,7 @@ pie_chart_UK:
 UK_retail_price:
   based_on:
     - .creator.multiverse
-    - .plot.facet_grid.line
+    - .plot.facet_grid.errorbands
   select_and_combine:
     fields:
       # Mask values that are non-existent or zero in the original data
@@ -380,10 +371,12 @@ UK_retail_price:
         path: predicted_C
         transform:
           - .sel_with_drop: [ !dag_prev , { j: 'UK' } ]
+          - .isel: [!dag_prev , {epoch: !slice [100, ~, ~]}]
       loss:
         path: loss
         transform:
           - .sel_with_drop: [!dag_prev , {kind: T}]
+          - .isel: [!dag_prev , {epoch: !slice [100, ~, ~]}]
   transform:
 
     # Flatten the probabilities
@@ -400,14 +393,14 @@ UK_retail_price:
         dims: { batch: [ seed, epoch ] }
     - broadcast: [!dag_prev , !dag_tag probability ]
       file_cache:
-        read: True
-        write: True
+        read: False
+        write: False
       tag: C_broadcast
     - marginal_from_ds: [!dag_tag C_broadcast ]
       kwargs: {x: x, y: loss, along_dim: [batch]}
       file_cache:
-        read: True
-        write: True
+        read: False
+        write: False
       tag: C_marginals
 
     - mean: [!dag_tag C_marginals ]
@@ -415,13 +408,23 @@ UK_retail_price:
     - getitem: [!dag_prev , 'mean']
       tag: C_mean
 
+    - std: [ !dag_tag C_marginals ]
+      kwargs: { x: x, y: y, along_dim: [ bin_idx ] }
+    - getitem: [ !dag_prev , 'std' ]
+#    - mul: [!dag_prev , 0.0001]
+      tag: C_std
+    - xr.Dataset:
+      - y: !dag_tag C_mean
+        yerr: !dag_tag C_std
+      tag: C_data
+
      # Multiply with the true transport flow
     - .isel_with_drop: [!dag_tag T, {seed: 0}]
     - create_mask: [!dag_prev , '>', 0]
     - .where: [!dag_node -2, !dag_prev , 0]
       tag: T_masked
     - .sum: [!dag_prev , 'i']
-    - mul: [!dag_tag C_mean, !dag_tag T_masked ]
+    - mul: [!dag_tag C_data, !dag_tag T_masked ]
     - .sum: [!dag_prev , 'i']
     - div: [!dag_prev , !dag_node -3]
     - .assign_coords: [!dag_prev , {Year: !range [2012, 2022]}]
@@ -431,14 +434,22 @@ UK_retail_price:
       kwargs: {index_col: 0}
     - .to_xarray: [!dag_prev ]
     - .to_array: [!dag_prev ]
+    - .squeeze_with_drop: [!dag_prev ]
     - .sel: [!dag_prev , {Year: !range [2012, 2022]}]
-      tag: ONS_RPI
+      tag: ONS_RPI_mean
+    - mul: [!dag_prev , 0]
+    - xr.Dataset:
+      - y: !dag_tag ONS_RPI_mean
+        yerr: !dag_prev
 
-    - concat_along: [[!dag_tag ONS_RPI, !dag_tag pred_RPI], 'type', ['Avg. RPI', 'Prediction']]
+    - concat_along: [[!dag_prev , !dag_tag pred_RPI], 'type', ['Avg. RPI', 'Prediction']]
     - .isel: [!dag_prev , {Year: 0}]
-    - div: [!dag_node -2, !dag_prev ]
+    - getitem: [!dag_prev , 'y']
+    - div: [!dag_node -3, !dag_prev ]
       tag: data
   x: Year
+  y: y
+  yerr: yerr
   hue: type
   style:
     figure.figsize: [!dag_result half_width, !dag_result quarter_width]
@@ -447,6 +458,9 @@ UK_retail_price:
       title: ''
     set_legend:
       title: ''
+    set_labels:
+      y: ""
+      x: ""
 
 # Compare the import and export discrepancies between the data and the prediction
 Mexico_export_discrepancy:
