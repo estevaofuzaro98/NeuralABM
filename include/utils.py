@@ -62,7 +62,7 @@ def random_tensor(
                 )
 
             return torch.tensor((u - l), dtype=torch.float) * torch.rand(
-                s, dtype=torch.float, device=device
+                s, dtype=torch.float
             ) + torch.tensor(l, dtype=torch.float)
 
         # Normal distribution

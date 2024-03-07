@@ -10,7 +10,6 @@ from dantro._import_tools import import_module_from_path
 sys.path.append(up(up(__file__)))
 sys.path.append(up(up(up(__file__))))
 
-Covid = import_module_from_path(mod_path=up(up(__file__)), mod_str="Covid")
 base = import_module_from_path(mod_path=up(up(up(__file__))), mod_str="include")
 
 log = logging.getLogger(__name__)

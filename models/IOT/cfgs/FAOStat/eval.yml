@@ -162,7 +162,7 @@ cost_Mexico:
     - std: [!dag_tag marginal]
       kwargs: {x: x, y: y, along_dim: [bin_idx]}
     - getitem: [ !dag_prev , 'std' ]
-    - mul: [!dag_prev , 0]
+#    - mul: [!dag_prev , 0]
       tag: std
     - xr.Dataset:
       - y: !dag_tag mean
@@ -172,6 +172,7 @@ cost_Mexico:
       tag: unnormalised_data
 
       # Normalize to mean of 2012
+    - getitem: [!dag_prev , 'y']
     - .isel: [!dag_prev , {Year: 0}]
     - .mean: [!dag_prev ]
     - div: [!dag_tag unnormalised_data, !dag_prev ]
@@ -411,7 +412,6 @@ UK_retail_price:
     - std: [ !dag_tag C_marginals ]
       kwargs: { x: x, y: y, along_dim: [ bin_idx ] }
     - getitem: [ !dag_prev , 'std' ]
-#    - mul: [!dag_prev , 0.0001]
       tag: C_std
     - xr.Dataset:
       - y: !dag_tag C_mean
