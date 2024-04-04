@@ -10,10 +10,10 @@ from .utils import random_tensor
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-def sigmoid(beta=torch.tensor(1.0)):
-    """Extends the torch.nn.sigmoid activation function by allowing for a slope parameter."""
+def sigmoid(alpha=torch.tensor(1.0), beta=torch.tensor(1.0)):
+    """Extends the torch.nn.sigmoid activation function by allowing for a scale and slope parameter."""
 
-    return lambda x: torch.sigmoid(beta * x)
+    return lambda x: alpha * torch.sigmoid(beta * x)
 
 
 # Pytorch activation functions.
